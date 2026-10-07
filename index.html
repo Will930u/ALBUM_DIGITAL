@@ -12,6 +12,8 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
     /* Estilos Metalizados Azul y Morado */
     body {
@@ -300,37 +302,41 @@
           </div>
         </div>
 
-        <!-- TAB NUEVO: GESTIÓN Y SUBIDA DE IMÁGENES A SUPABASE STORAGE -->
+        <!-- TAB GESTIÓN DE IMÁGENES: CARGA MASIVA A SUPABASE STORAGE -->
         <div id="adminContentImagenes" class="hidden space-y-6">
           <div class="bg-slate-950/60 p-5 rounded-xl border border-purple-500/30 space-y-4">
             <div class="border-b border-purple-500/20 pb-3">
               <h3 class="text-base font-bold text-purple-200 flex items-center space-x-2">
                 <i data-lucide="upload-cloud" class="w-5 h-5 text-purple-400"></i>
-                <span>Cargar / Actualizar Barajita en Supabase Storage</span>
+                <span>Carga Masiva de Barajitas en Supabase Storage</span>
               </h3>
-              <p class="text-xs text-slate-400 mt-1">Sube la imagen para el número de cromo seleccionado (Se guardará automáticamente como <code class="text-purple-300 font-mono">[número].jpg</code> en el bucket 'barajitas').</p>
+              <p class="text-xs text-slate-400 mt-1">
+                Selecciona múltiples imágenes a la vez. Los archivos deben estar nombrados con el número de la barajita (Ej: <code>1.jpg</code>, <code>2.png</code>, <code>100.jpg</code>).
+              </p>
             </div>
 
-            <form onsubmit="uploadStickerImage(event)" class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-              <div>
-                <label class="block text-xs font-semibold text-purple-200 mb-1">Número de Barajita (1 - 2000):</label>
-                <input type="number" id="imgStickerNum" min="1" max="2000" required placeholder="Ej: 1" class="w-full bg-slate-900 border border-purple-500/40 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-purple-400 font-bold">
+            <div class="flex flex-col md:flex-row gap-4 items-center">
+              <div class="flex-1 w-full">
+                <label class="block text-xs font-semibold text-purple-200 mb-1">Seleccionar Imágenes (Lote JPG / PNG):</label>
+                <input type="file" id="bulkBarajitasInput" accept="image/jpeg, image/png" multiple
+                  class="w-full text-xs text-slate-300 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-500 cursor-pointer bg-slate-900/80 rounded-lg p-1 border border-purple-500/40">
               </div>
+              <button type="button" onclick="uploadBulkBarajitas()" id="btnBulkUpload"
+                class="metal-button w-full md:w-auto px-6 py-2.5 text-xs font-bold text-white flex items-center justify-center gap-2">
+                <i class="fas fa-cloud-upload-alt"></i> Subir Lote a Supabase
+              </button>
+            </div>
 
-              <div>
-                <label class="block text-xs font-semibold text-purple-200 mb-1">Seleccionar Imagen (JPG / PNG):</label>
-                <input type="file" id="imgFileAsset" accept="image/*" required class="w-full bg-slate-900 border border-purple-500/40 rounded-lg p-1.5 text-xs text-slate-300 file:mr-2 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-500">
+            <!-- Indicador y Barra de Progreso -->
+            <div id="bulkProgressContainer" class="hidden mt-4">
+              <div class="flex justify-between text-xs text-slate-300 mb-1">
+                <span id="bulkStatusText">Subiendo barajitas...</span>
+                <span id="bulkPercentText">0%</span>
               </div>
-
-              <div>
-                <button type="submit" id="btnUploadImg" class="metal-button w-full py-2.5 rounded-lg text-xs font-bold text-white flex items-center justify-center space-x-2">
-                  <i data-lucide="upload" class="w-4 h-4"></i>
-                  <span>Subir a Supabase Storage</span>
-                </button>
+              <div class="w-full bg-slate-800 rounded-full h-2.5 overflow-hidden border border-purple-500/30">
+                <div id="bulkProgressBar" class="bg-gradient-to-r from-blue-500 to-purple-600 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
               </div>
-            </form>
-
-            <div id="uploadStatusMessage" class="hidden p-3 rounded-lg text-xs font-bold"></div>
+            </div>
           </div>
         </div>
 
@@ -351,7 +357,7 @@
             </div>
           </div>
 
-          <!-- Modulo para Registrar Retiro/Gasto del Margen del 30% -->
+          <!-- Módulo para Registrar Retiro/Gasto del Margen del 30% -->
           <div class="bg-purple-950/30 p-4 rounded-xl border border-purple-500/30 space-y-3">
             <h4 class="text-xs font-bold text-purple-200 uppercase tracking-wider flex items-center space-x-2">
               <i data-lucide="minus-circle" class="w-4 h-4 text-purple-400"></i>
@@ -555,6 +561,8 @@
       logoClicks: 0,
       clickTimer: null,
       supabase: null,
+      financialChart: null,
+      userChart: null,
       config: {
         supabaseUrl: localStorage.getItem('cfg_sb_url') || '',
         supabaseKey: localStorage.getItem('cfg_sb_key') || '',
@@ -572,6 +580,7 @@
       await fetchBcvRate();
       initSupabase();
       loadUserData();
+      populateConfigForm();
     });
 
     function getOrCreateUserId() {
@@ -650,11 +659,15 @@
       STATE.claimedMilestones = JSON.parse(localStorage.getItem(`claimed_milestones_${STATE.userId}`) || '[]');
 
       if (STATE.supabase) {
-        const { data } = await STATE.supabase.from('usuarios').select('*').eq('id', STATE.userId).single();
-        if (data) {
-          STATE.userStickersCount = data.cantidad_barajitas || 0;
-          STATE.userBalanceBs = data.saldo_bs || 0;
-          STATE.claimedMilestones = data.claimed_milestones || [];
+        try {
+          const { data } = await STATE.supabase.from('usuarios').select('*').eq('id', STATE.userId).single();
+          if (data) {
+            STATE.userStickersCount = data.cantidad_barajitas || 0;
+            STATE.userBalanceBs = data.saldo_bs || 0;
+            STATE.claimedMilestones = data.claimed_milestones || [];
+          }
+        } catch (err) {
+          console.error("Error al cargar datos desde Supabase:", err);
         }
       }
       updateUIHeader();
@@ -794,7 +807,7 @@
       milestones.forEach(m => {
         const isUnlocked = STATE.userStickersCount >= m;
         const isClaimed = STATE.claimedMilestones.includes(m);
-        const usdAmount = "200.00"; // Premio fijo $200 por hito
+        const usdAmount = "200.00";
 
         const btn = document.createElement('button');
         btn.type = 'button';
@@ -807,7 +820,8 @@
         }`;
 
         btn.innerHTML = `
-          <span class="font-bold text-amber-300">Hito Barajita #${m}</span>           <span class="text-xs text-slate-300">$${usdAmount} USD (Fijo)</span>
+          <span class="font-bold text-amber-300">Hito Barajita #${m}</span>
+          <span class="text-xs text-slate-300">$${usdAmount} USD (Fijo)</span>
           <span class="text-[10px] mt-1 font-bold ${isClaimed ? 'text-slate-400' : isUnlocked ? 'text-emerald-400' : 'text-slate-500'}">
             ${isClaimed ? '[ RETIRADO ]' : isUnlocked ? '¡DISPONIBLE!' : 'BLOQUEADO'}
           </span>
@@ -835,9 +849,9 @@
 
     function selectMilestoneToWithdraw(m, usd) {
       STATE.selectedMilestone = m;
-      const bsVal = (parseFloat(usd) * STATE.bcvRate).toFixed(2);
+      const bsAmount = parseFloat(usd) * STATE.bcvRate;
       document.getElementById('withdrawUSD').innerText = `$${usd} USD`;
-      document.getElementById('withdrawBs').innerText = `Bs. ${bsVal}`;
+      document.getElementById('withdrawBs').innerText = `Bs. ${bsAmount.toFixed(2)}`;
       document.getElementById('btnSendWithdraw').disabled = false;
     }
 
@@ -847,39 +861,39 @@
 
     async function submitWithdrawalRequest(e) {
       e.preventDefault();
-      if (!STATE.selectedMilestone) return alert('Por favor selecciona un hito válido.');
+      if (!STATE.selectedMilestone) return;
 
       const bank = document.getElementById('wBank').value;
       const phone = document.getElementById('wPhone').value;
       const id = document.getElementById('wId').value;
-      const usdVal = "200.00";
-      const bsVal = (200 * STATE.bcvRate).toFixed(2);
+      const montoBs = 200 * STATE.bcvRate;
 
-      const withdrawalData = {
+      const withdrawData = {
         usuario_id: STATE.userId,
-        tipo: 'hito_parcial',
-        milestone: STATE.selectedMilestone,
-        monto_bs: bsVal,
-        monto_usd: usdVal,
+        tipo: 'hito',
+        hito: STATE.selectedMilestone,
+        monto_bs: montoBs,
+        monto_usd: 200,
         datos_pago: `${bank} | ${phone} | ${id}`,
         estado: 'pendiente',
         fecha: new Date().toISOString()
       };
 
       if (STATE.supabase) {
-        await STATE.supabase.from('retiros_premios').insert([withdrawalData]);
+        await STATE.supabase.from('retiros').insert([withdrawData]);
       } else {
-        const localW = JSON.parse(localStorage.getItem('local_withdrawals') || '[]');
-        localW.push(withdrawalData);
-        localStorage.setItem('local_withdrawals', JSON.stringify(localW));
+        const localRetiros = JSON.parse(localStorage.getItem('local_retiros') || '[]');
+        localRetiros.push(withdrawData);
+        localStorage.setItem('local_retiros', JSON.stringify(localRetiros));
       }
 
       if (STATE.config.telegramToken && STATE.config.telegramChatId) {
-        const msg = `💸 *SOLICITUD DE PREMIO HITO ($200)*\n\n` +
+        const msg = `🏆 *SOLICITUD DE RETIRO POR HITO ($200)*\n\n` +
                     `👤 *Usuario:* \`${STATE.userId}\`\n` +
-                    `🎴 *Hito:* Barajita #${STATE.selectedMilestone}\n` +
-                    `💰 *Premio:* $${usdVal} USD (Bs.${bsVal})\n` +
-                    `🏦 *Pago Móvil:* ${bank} / ${phone} /${id}`;
+                    `🎯 *Hito:* Barajita #${STATE.selectedMilestone}\n` +
+                    `💰 *Monto:* $200 USD (Bs. ${montoBs.toFixed(2)})\n` +
+                    `🏦 *Pago Móvil:* ${bank} - ${phone} - ${id}\n` +
+                    `📅 *Fecha:* ${new Date().toLocaleString()}`;
         try {
           await fetch(`https://api.telegram.org/bot${STATE.config.telegramToken}/sendMessage`, {
             method: 'POST',
@@ -887,82 +901,119 @@
             body: JSON.stringify({ chat_id: STATE.config.telegramChatId, text: msg, parse_mode: 'Markdown' })
           });
         } catch (err) {
-          console.error('Error Telegram:', err);
+          console.error("Error Telegram:", err);
         }
       }
 
-      alert(`Solicitud de retiro del hito #${STATE.selectedMilestone} por $200 enviada con éxito.`);
+      alert('Solicitud de retiro enviada exitosamente a revisión.');
       closeWithdrawModal();
     }
 
-    // RETIRO TOTAL / LIQUIDACIÓN POR VALOR NETO
-    async function confirmTotalLiquidate() {
+    function confirmTotalLiquidate() {
       if (STATE.userBalanceBs <= 0) {
-        return alert('No posees saldo en el Valor Neto para liquidar.');
+        alert('No posees saldo líquido acumulado para efectuar un retiro total.');
+        return;
       }
-      const usdVal = STATE.bcvRate > 0 ? (STATE.userBalanceBs / STATE.bcvRate).toFixed(2) : '0.00';
-      const confirmAction = confirm(`⚠️ LIQUIDACIÓN TOTAL DEL ÁLBUM\n\n` +
-        `Retirarás el 100% de tu saldo: Bs. ${STATE.userBalanceBs.toFixed(2)} ($${usdVal} USD).\n` +
-        `Al procesar la salida, tu álbum se vaciará a 0 barajitas y tu saldo quedará en 0.\n\n` +
-        `¿Deseas solicitar la liquidación total?`);
-
-      if (!confirmAction) return;
-
-      const bank = prompt("Ingresa tu Banco para Pago Móvil:");
-      const phone = prompt("Ingresa tu número de Teléfono:");
-      const id = prompt("Ingresa tu Cédula/RIF:");
-
-      if (!bank || !phone || !id) {
-        return alert("Debes ingresar todos los datos de Pago Móvil para continuar.");
+      const usdVal = (STATE.userBalanceBs / STATE.bcvRate).toFixed(2);
+      if (confirm(`¿Deseas liquidar el 100% de tu Valor Neto acumulado (Bs. ${STATE.userBalanceBs.toFixed(2)} / ~$${usdVal} USD)?\n\nAtención: Esta acción procesará el pago total y reiniciará tu álbum.`)) {
+        openWithdrawModalForTotal();
       }
-
-      const withdrawalData = {
-        usuario_id: STATE.userId,
-        tipo: 'liquidacion_total',
-        milestone: 0,
-        monto_bs: STATE.userBalanceBs.toFixed(2),
-        monto_usd: usdVal,
-        datos_pago: `${bank} | ${phone} \vert{}${id}`,
-        estado: 'pendiente',
-        fecha: new Date().toISOString()
-      };
-
-      if (STATE.supabase) {
-        await STATE.supabase.from('retiros_premios').insert([withdrawalData]);
-      } else {
-        const localW = JSON.parse(localStorage.getItem('local_withdrawals') || '[]');
-        localW.push(withdrawalData);
-        localStorage.setItem('local_withdrawals', JSON.stringify(localW));
-      }
-
-      if (STATE.config.telegramToken && STATE.config.telegramChatId) {
-        const msg = `🔴 *SOLICITUD DE LIQUIDACIÓN TOTAL (VALOR NETO)*\n\n` +
-                    `👤 *Usuario:* \`${STATE.userId}\`\n` +
-                    `💰 *Monto Total:* Bs. ${STATE.userBalanceBs.toFixed(2)} ($${usdVal} USD)\n` +
-                    `🏦 *Pago Móvil:* ${bank} / ${phone} /${id}\n` +
-                    `⚠️ *Acción:* Vaciar álbum e ir a cero al aprobar.`;
-        try {
-          await fetch(`https://api.telegram.org/bot${STATE.config.telegramToken}/sendMessage`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ chat_id: STATE.config.telegramChatId, text: msg, parse_mode: 'Markdown' })
-          });
-        } catch (err) {
-          console.error('Error Telegram:', err);
-        }
-      }
-
-      alert('Solicitud de Liquidación Total enviada. Queda en revisión por administración.');
     }
 
-    // ADMINISTRACIÓN
+    function openWithdrawModalForTotal() {
+      const container = document.getElementById('milestoneOptions');
+      const usdVal = (STATE.userBalanceBs / STATE.bcvRate).toFixed(2);
+      container.innerHTML = `
+        <div class="col-span-2 p-3 bg-red-950/40 border border-red-500 rounded-xl text-xs text-white">
+          <strong class="text-red-300 block mb-1">Liquidación 100% Saldo Neto Total</strong>
+          <span>Saldo disponible: Bs. ${STATE.userBalanceBs.toFixed(2)} ($${usdVal} USD)</span>
+        </div>
+      `;
+      document.getElementById('withdrawUSD').innerText = `$${usdVal} USD`;
+      document.getElementById('withdrawBs').innerText = `Bs. ${STATE.userBalanceBs.toFixed(2)}`;
+      STATE.selectedMilestone = 'TOTAL';
+      document.getElementById('btnSendWithdraw').disabled = false;
+      document.getElementById('withdrawModal').classList.remove('hidden');
+    }
+
+    // CARGA MASIVA DE BARAJITAS A SUPABASE STORAGE
+    async function uploadBulkBarajitas() {
+      const fileInput = document.getElementById('bulkBarajitasInput');
+      const files = fileInput.files;
+
+      if (!files || files.length === 0) {
+        alert('Por favor, selecciona al menos un archivo de imagen.');
+        return;
+      }
+
+      if (!STATE.supabase) {
+        alert('Error: Supabase no está configurado correctamente en el panel admin.');
+        return;
+      }
+
+      const btn = document.getElementById('btnBulkUpload');
+      const progressContainer = document.getElementById('bulkProgressContainer');
+      const progressBar = document.getElementById('bulkProgressBar');
+      const statusText = document.getElementById('bulkStatusText');
+      const percentText = document.getElementById('bulkPercentText');
+
+      btn.disabled = true;
+      btn.classList.add('opacity-50', 'cursor-not-allowed');
+      progressContainer.classList.remove('hidden');
+
+      let total = files.length;
+      let exitosos = 0;
+      let fallidos = 0;
+
+      for (let i = 0; i < total; i++) {
+        const file = files[i];
+        const match = file.name.match(/\d+/);
+
+        if (!match) {
+          fallidos++;
+          continue;
+        }
+
+        const barajitaNum = parseInt(match[0], 10);
+        const fileExt = file.name.split('.').pop().toLowerCase();
+        const fileName = `${barajitaNum}.${fileExt === 'png' ? 'png' : 'jpg'}`;
+
+        try {
+          const { data, error } = await STATE.supabase.storage
+            .from('barajitas')
+            .upload(fileName, file, {
+              cacheControl: '3600',
+              upsert: true
+            });
+
+          if (error) throw error;
+          exitosos++;
+        } catch (err) {
+          console.error(`Error al subir ${file.name}:`, err);
+          fallidos++;
+        }
+
+        const percent = Math.round(((i + 1) / total) * 100);
+        progressBar.style.width = `${percent}%`;
+        percentText.innerText = `${percent}%`;
+        statusText.innerText = `Procesando: ${i + 1} de ${total} (Éxitos: ${exitosos} | Errores: ${fallidos})`;
+      }
+
+      alert(`Proceso finalizado.\n\nSubidas con éxito: ${exitosos}\nFallidas o sin número: ${fallidos}`);
+
+      fileInput.value = '';
+      btn.disabled = false;
+      btn.classList.remove('opacity-50', 'cursor-not-allowed');
+      progressContainer.classList.add('hidden');
+      progressBar.style.width = '0%';
+    }
+
+    // PANEL ADMIN Y NAVEGACIÓN DE PESTAÑAS
     function openAdminPanel() {
-      document.getElementById('introSection').classList.add('hidden');
       document.getElementById('albumSection').classList.add('hidden');
       document.getElementById('tiendaSection').classList.add('hidden');
-      document.getElementById('mainHeader').classList.remove('hidden');
       document.getElementById('adminSection').classList.remove('hidden');
-      loadPendingPayments();
+      switchAdminTab('pagos');
     }
 
     function exitAdmin() {
@@ -970,320 +1021,87 @@
     }
 
     function switchAdminTab(tab) {
-      document.getElementById('adminContentPagos').classList.add('hidden');
-      document.getElementById('adminContentRetiros').classList.add('hidden');
-      document.getElementById('adminContentImagenes').classList.add('hidden');
-      document.getElementById('adminContentMetricas').classList.add('hidden');
-      document.getElementById('adminContentUsuarios').classList.add('hidden');
-      document.getElementById('adminContentConfig').classList.add('hidden');
+      const contents = ['Pagos', 'Retiros', 'Imagenes', 'Metricas', 'Usuarios', 'Config'];
+      contents.forEach(c => {
+        const el = document.getElementById(`adminContent${c}`);
+        if (el) el.classList.add('hidden');
+        const tabEl = document.getElementById(`tabAdmin${c}`);
+        if (tabEl) tabEl.className = "pb-3 font-semibold text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center space-x-2 whitespace-nowrap";
+      });
 
-      document.getElementById('tabAdminPagos').className = "pb-3 font-semibold text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center space-x-2 whitespace-nowrap";
-      document.getElementById('tabAdminRetiros').className = "pb-3 font-semibold text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center space-x-2 whitespace-nowrap";
-      document.getElementById('tabAdminImagenes').className = "pb-3 font-semibold text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center space-x-2 whitespace-nowrap";
-      document.getElementById('tabAdminMetricas').className = "pb-3 font-semibold text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center space-x-2 whitespace-nowrap";
-      document.getElementById('tabAdminUsuarios').className = "pb-3 font-semibold text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center space-x-2 whitespace-nowrap";
-      document.getElementById('tabAdminConfig').className = "pb-3 font-semibold text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center space-x-2 whitespace-nowrap";
+      const activeContent = document.getElementById(`adminContent${tab.charAt(0).toUpperCase() + tab.slice(1)}`);
+      if (activeContent) activeContent.classList.remove('hidden');
+      const activeTab = document.getElementById(`tabAdmin${tab.charAt(0).toUpperCase() + tab.slice(1)}`);
+      if (activeTab) activeTab.className = "pb-3 font-semibold text-sm border-b-2 border-purple-500 text-purple-300 flex items-center space-x-2 whitespace-nowrap";
 
-      if (tab === 'pagos') {
-        document.getElementById('adminContentPagos').classList.remove('hidden');
-        document.getElementById('tabAdminPagos').className = "pb-3 font-semibold text-sm border-b-2 border-purple-500 text-purple-300 flex items-center space-x-2 whitespace-nowrap";
-        loadPendingPayments();
-      } else if (tab === 'retirosAdmin') {
-        document.getElementById('adminContentRetiros').classList.remove('hidden');
-        document.getElementById('tabAdminRetiros').className = "pb-3 font-semibold text-sm border-b-2 border-purple-500 text-purple-300 flex items-center space-x-2 whitespace-nowrap";
-        loadPendingWithdrawals();
-      } else if (tab === 'imagenesAdmin') {
-        document.getElementById('adminContentImagenes').classList.remove('hidden');
-        document.getElementById('tabAdminImagenes').className = "pb-3 font-semibold text-sm border-b-2 border-purple-500 text-purple-300 flex items-center space-x-2 whitespace-nowrap";
-      } else if (tab === 'metricas') {
-        document.getElementById('adminContentMetricas').classList.remove('hidden');
-        document.getElementById('tabAdminMetricas').className = "pb-3 font-semibold text-sm border-b-2 border-purple-500 text-purple-300 flex items-center space-x-2 whitespace-nowrap";
-        renderFinancialMetrics();
-      } else if (tab === 'usuarios') {
-        document.getElementById('adminContentUsuarios').classList.remove('hidden');
-        document.getElementById('tabAdminUsuarios').className = "pb-3 font-semibold text-sm border-b-2 border-purple-500 text-purple-300 flex items-center space-x-2 whitespace-nowrap";
-        loadUserList();
-      } else if (tab === 'config') {
-        document.getElementById('adminContentConfig').classList.remove('hidden');
-        document.getElementById('tabAdminConfig').className = "pb-3 font-semibold text-sm border-b-2 border-purple-500 text-purple-300 flex items-center space-x-2 whitespace-nowrap";
-        loadConfigForm();
-      }
-    }
-
-    // SUBIDA DIRECTA DE IMÁGENES HACIA SUPABASE STORAGE
-    async function uploadStickerImage(e) {
-      e.preventDefault();
-      const stickerNum = document.getElementById('imgStickerNum').value;
-      const fileInput = document.getElementById('imgFileAsset');
-      const btn = document.getElementById('btnUploadImg');
-      const statusMsg = document.getElementById('uploadStatusMessage');
-
-      if (!STATE.supabase) {
-        alert('Supabase no está configurado. Por favor ingresa la URL y Anon Key en la pestaña Configuración.');
-        return;
-      }
-
-      if (!fileInput.files || fileInput.files.length === 0) {
-        alert('Selecciona un archivo de imagen válido.');
-        return;
-      }
-
-      const file = fileInput.files[0];
-      const fileName = `${stickerNum}.jpg`;
-
-      btn.disabled = true;
-      btn.innerText = 'Subiendo Imagen...';
-      statusMsg.classList.add('hidden');
-
-      try {
-        const { data, error } = await STATE.supabase.storage
-          .from('barajitas')
-          .upload(fileName, file, {
-            cacheControl: '3600',
-            upsert: true
-          });
-
-        if (error) {
-          throw error;
-        }
-
-        statusMsg.className = "p-3 rounded-lg text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 block";
-        statusMsg.innerText = `✅ Imagen para la Barajita #${stickerNum} subida con éxito a Supabase Storage (${fileName}).`;
-        fileInput.value = '';
-        document.getElementById('imgStickerNum').value = '';
-      } catch (err) {
-        console.error('Error al subir imagen:', err);
-        statusMsg.className = "p-3 rounded-lg text-xs font-bold bg-red-500/20 text-red-300 border border-red-500/40 block";
-        statusMsg.innerText = `❌ Error al subir imagen: ${err.message || 'Asegúrate de que el bucket "barajitas" exista y sea público.'}`;
-      } finally {
-        btn.disabled = false;
-        btn.innerHTML = `<i data-lucide="upload" class="w-4 h-4"></i><span>Subir a Supabase Storage</span>`;
-        lucide.createIcons();
-      }
+      if (tab === 'pagos') loadPendingPayments();
+      if (tab === 'retirosAdmin') loadPendingWithdrawals();
+      if (tab === 'metricas') renderFinancialMetrics();
+      if (tab === 'usuarios') renderUserList();
     }
 
     async function loadPendingPayments() {
       const tbody = document.getElementById('pendingPaymentsTable');
       tbody.innerHTML = '';
-      let pending = [];
+      let payments = [];
+
       if (STATE.supabase) {
         const { data } = await STATE.supabase.from('transacciones').select('*').eq('estado', 'pendiente');
-        pending = data || [];
+        payments = data || [];
       } else {
-        const localTxs = JSON.parse(localStorage.getItem('local_txs') || '[]');
-        pending = localTxs.filter(t => t.estado === 'pendiente');
-      }
-      if (pending.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-500">No hay pagos pendientes.</td></tr>`;
-        return;
-      }
-      pending.forEach(tx => {
-        const usdVal = STATE.bcvRate > 0 ? (parseFloat(tx.monto_bs) / STATE.bcvRate).toFixed(2) : '0.00';
-        const tr = document.createElement('tr');
-        tr.className = "border-b border-slate-800 hover:bg-slate-900/50";
-        tr.innerHTML = `
-          <td class="p-3 text-xs">${new Date(tx.fecha).toLocaleString()}</td>
-          <td class="p-3 font-mono text-purple-300">${tx.usuario_id}</td>
-          <td class="p-3 font-bold">${tx.barajitas_qty}</td>
-          <td class="p-3 text-emerald-400 font-bold">Bs. ${parseFloat(tx.monto_bs).toFixed(2)} <span class="text-xs text-slate-400">($${usdVal})</span></td>
-          <td class="p-3 font-mono">${tx.referencia}</td>
-          <td class="p-3 text-center space-x-2">
-            <button onclick="approvePayment('${tx.referencia}', '${tx.usuario_id}', ${tx.barajitas_qty},${tx.monto_bs})" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition">Aprobar</button>
-            <button onclick="rejectPayment('${tx.referencia}')" class="px-3 py-1 bg-red-600 hover:bg-red-500 text-white rounded-lg text-xs font-bold transition">Rechazar</button>
-          </td>
-        `;
-        tbody.appendChild(tr);
-      });
-    }
-
-    async function loadPendingWithdrawals() {
-      const tbody = document.getElementById('pendingWithdrawalsTable');
-      tbody.innerHTML = '';
-      let pending = [];
-      if (STATE.supabase) {
-        const { data } = await STATE.supabase.from('retiros_premios').select('*').eq('estado', 'pendiente');
-        pending = data || [];
-      } else {
-        const localW = JSON.parse(localStorage.getItem('local_withdrawals') || '[]');
-        pending = localW.filter(w => w.estado === 'pendiente');
+        payments = JSON.parse(localStorage.getItem('local_txs') || '[]').filter(p => p.estado === 'pendiente');
       }
 
-      if (pending.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-500">No hay solicitudes de retiro pendientes.</td></tr>`;
+      if (payments.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-500">No hay pagos pendientes por aprobar.</td></tr>`;
         return;
       }
 
-      pending.forEach(w => {
-        const isTotal = w.tipo === 'liquidacion_total';
-        const tr = document.createElement('tr');
-        tr.className = "border-b border-slate-800 hover:bg-slate-900/50";
-        tr.innerHTML = `
-          <td class="p-3 text-xs">${new Date(w.fecha).toLocaleString()}</td>
-          <td class="p-3 font-mono text-purple-300">${w.usuario_id}</td>
-          <td class="p-3 font-bold ${isTotal ? 'text-red-400' : 'text-amber-300'}">
-            ${isTotal ? 'LIQUIDACIÓN TOTAL' : `Hito #${w.milestone}`}
-          </td>
-          <td class="p-3 text-emerald-400 font-bold">$${w.monto_usd} USD <span class="text-xs text-slate-400">(Bs. ${w.monto_bs})</span></td>
-          <td class="p-3 text-xs font-mono">${w.datos_pago}</td>
+      payments.forEach((p, idx) => {
+        const usdVal = (p.monto_bs / (STATE.bcvRate || 1)).toFixed(2);
+        const row = document.createElement('tr');
+        row.className = "border-b border-purple-500/10 hover:bg-purple-950/20";
+        row.innerHTML = `
+          <td class="p-3 text-xs">${new Date(p.fecha).toLocaleString()}</td>
+          <td class="p-3 font-mono text-purple-300">${p.usuario_id}</td>
+          <td class="p-3 font-bold">${p.barajitas_qty}</td>
+          <td class="p-3 text-emerald-400 font-bold">Bs. ${p.monto_bs.toFixed(2)} ($${usdVal})</td>
+          <td class="p-3 font-mono">${p.referencia}</td>
           <td class="p-3 text-center space-x-2">
-            <button onclick="approveWithdrawal('${w.usuario_id}',${w.milestone}, ${w.monto_bs}, '${w.tipo || 'hito_parcial'}')" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition">Aprobar Retiro</button>
+            <button onclick="approvePayment('${p.referencia}', '${p.usuario_id}', ${p.barajitas_qty}, ${p.monto_bs})" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs font-bold">Aprobar</button>
+            <button onclick="rejectPayment('${p.referencia}')" class="px-3 py-1 bg-red-600 hover:bg-red-500 text-white rounded text-xs font-bold">Rechazar</button>
           </td>
         `;
-        tbody.appendChild(tr);
+        tbody.appendChild(row);
       });
-    }
-
-    async function approveWithdrawal(userId, milestone, montoBs, tipo) {
-      // Solicitar el número de referencia del pago realizado
-      const refPago = prompt("Ingresa el número de referencia del Pago Móvil realizado para completar la aprobación:");
-      if (!refPago || refPago.trim() === "") {
-        return alert("Aprobación cancelada. Se requiere el número de referencia.");
-      }
-
-      if (tipo === 'liquidacion_total') {
-        // Liquidación total por botón Valor Neto: Vacía álbum y saldo a 0
-        if (STATE.supabase) {
-          await STATE.supabase.from('retiros_premios').update({ estado: 'aprobado', referencia_pago: refPago }).eq('usuario_id', userId).eq('tipo', 'liquidacion_total').eq('estado', 'pendiente');
-          await STATE.supabase.from('usuarios').update({ cantidad_barajitas: 0, saldo_bs: 0, claimed_milestones: [] }).eq('id', userId);
-        } else {
-          const localW = JSON.parse(localStorage.getItem('local_withdrawals') || '[]');
-          const target = localW.find(w => w.usuario_id === userId && w.tipo === 'liquidacion_total' && w.estado === 'pendiente');
-          if (target) {
-            target.estado = 'aprobado';
-            target.referencia_pago = refPago;
-          }
-          localStorage.setItem('local_withdrawals', JSON.stringify(localW));
-
-          localStorage.setItem(`stickers_${userId}`, '0');
-          localStorage.setItem(`balance_${userId}`, '0');
-          localStorage.setItem(`claimed_milestones_${userId}`, JSON.stringify([]));
-        }
-
-        const msgAprobacion = `✅ SOLICITUD DE LIQUIDACIÓN TOTAL (VALOR NETO)\n\n` +
-                              `Esa solicitud fue pagada con éxito.\n` +
-                              `Número de referencia: ${refPago}`;
-
-        if (STATE.config.telegramToken && STATE.config.telegramChatId) {
-          fetch(`https://api.telegram.org/bot${STATE.config.telegramToken}/sendMessage`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              chat_id: STATE.config.telegramChatId,
-              text: `🔴 *SOLICITUD DE LIQUIDACIÓN TOTAL APAGADA*\n\n` +
-                    `👤 *Usuario:* \`${userId}\`\n` +
-                    `✅ *Estado:* Pagada con éxito\n` +
-                    `🔢 *Número de Referencia:* \`${refPago}\``,
-              parse_mode: 'Markdown'
-            })
-          });
-        }
-
-        alert(`${msgAprobacion}\n\nÁlbum del usuario vaciado a 0.`);
-      } else {
-        // Retiro Parcial por Hito ($200 tasa BCV):
-        // Descuenta monto en Bs., conserva barajitas intactas
-        if (STATE.supabase) {
-          await STATE.supabase.from('retiros_premios').update({ estado: 'aprobado', referencia_pago: refPago }).eq('usuario_id', userId).eq('milestone', milestone).eq('estado', 'pendiente');
-          const { data: user } = await STATE.supabase.from('usuarios').select('*').eq('id', userId).single();
-          const currentClaimed = user && user.claimed_milestones ? user.claimed_milestones : [];
-          if (!currentClaimed.includes(milestone)) currentClaimed.push(milestone);
-
-          const newBalance = Math.max(0, (user.saldo_bs || 0) - parseFloat(montoBs));
-          let newStickers = user.cantidad_barajitas || 0;
-
-          // Si es el hito 2000 (último), resetea el ciclo completo
-          if (milestone === 2000) {
-            newStickers = 0;
-            currentClaimed.length = 0;
-          }
-
-          await STATE.supabase.from('usuarios').update({
-            saldo_bs: newBalance,
-            cantidad_barajitas: newStickers,
-            claimed_milestones: currentClaimed
-          }).eq('id', userId);
-        } else {
-          const localW = JSON.parse(localStorage.getItem('local_withdrawals') || '[]');
-          const target = localW.find(w => w.usuario_id === userId && w.milestone === milestone && w.estado === 'pendiente');
-          if (target) {
-            target.estado = 'aprobado';
-            target.referencia_pago = refPago;
-          }
-          localStorage.setItem('local_withdrawals', JSON.stringify(localW));
-
-          const currentClaimed = JSON.parse(localStorage.getItem(`claimed_milestones_${userId}`) || '[]');
-          if (!currentClaimed.includes(milestone)) currentClaimed.push(milestone);
-
-          const currentBal = parseFloat(localStorage.getItem(`balance_${userId}`) || '0');
-          const newBalance = Math.max(0, currentBal - parseFloat(montoBs));
-          let currentStickers = parseInt(localStorage.getItem(`stickers_${userId}`) || '0');
-
-          if (milestone === 2000) {
-            currentStickers = 0;
-            currentClaimed.length = 0;
-          }
-
-          localStorage.setItem(`balance_${userId}`, newBalance.toString());
-          localStorage.setItem(`stickers_${userId}`, currentStickers.toString());
-          localStorage.setItem(`claimed_milestones_${userId}`, JSON.stringify(currentClaimed));
-        }
-
-        if (STATE.config.telegramToken && STATE.config.telegramChatId) {
-          fetch(`https://api.telegram.org/bot${STATE.config.telegramToken}/sendMessage`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              chat_id: STATE.config.telegramChatId,
-              text: `💸 *SOLICITUD DE PREMIO HITO #${milestone} PAGADA*\n\n` +
-                    `👤 *Usuario:* \`${userId}\`\n` +
-                    `✅ *Estado:* Pagada con éxito\n` +
-                    `🔢 *Número de Referencia:* \`${refPago}\``,
-              parse_mode: 'Markdown'
-            })
-          });
-        }
-
-        alert(`Solicitud del Hito #${milestone} fue pagada con éxito.\nNúmero de referencia: ${refPago}`);
-      }
-
-      loadUserData();
-      loadPendingWithdrawals();
     }
 
     async function approvePayment(ref, userId, qty, montoBs) {
-      const userNetShareBs = montoBs * 0.70;
       if (STATE.supabase) {
         await STATE.supabase.from('transacciones').update({ estado: 'aprobado' }).eq('referencia', ref);
         const { data: user } = await STATE.supabase.from('usuarios').select('*').eq('id', userId).single();
-        const currentQty = user ? user.cantidad_barajitas : 0;
-        const currentBalance = user ? user.saldo_bs : 0;
+        const currentQty = user ? user.cantidad_barajitas || 0 : 0;
+        const currentBal = user ? user.saldo_bs || 0 : 0;
+        const netIncrementBs = montoBs * 0.70;
+
         await STATE.supabase.from('usuarios').upsert({
           id: userId,
           cantidad_barajitas: currentQty + qty,
-          saldo_bs: currentBalance + userNetShareBs
+          saldo_bs: currentBal + netIncrementBs
         });
       } else {
         const localTxs = JSON.parse(localStorage.getItem('local_txs') || '[]');
-        const tx = localTxs.find(t => t.referencia === ref);
-        if (tx) tx.estado = 'aprobado';
+        const target = localTxs.find(t => t.referencia === ref);
+        if (target) target.estado = 'aprobado';
         localStorage.setItem('local_txs', JSON.stringify(localTxs));
-        const currentQty = parseInt(localStorage.getItem(`stickers_${userId}`) || '0');
-        const currentBalance = parseFloat(localStorage.getItem(`balance_${userId}`) || '0');
-        localStorage.setItem(`stickers_${userId}`, currentQty + qty);
-        localStorage.setItem(`balance_${userId}`, currentBalance + userNetShareBs);
+
+        const curQty = parseInt(localStorage.getItem(`stickers_${userId}`) || '0');
+        const curBal = parseFloat(localStorage.getItem(`balance_${userId}`) || '0');
+        localStorage.setItem(`stickers_${userId}`, curQty + qty);
+        localStorage.setItem(`balance_${userId}`, curBal + (montoBs * 0.70));
       }
-      if (STATE.config.telegramToken && STATE.config.telegramChatId) {
-        fetch(`https://api.telegram.org/bot${STATE.config.telegramToken}/sendMessage`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            chat_id: STATE.config.telegramChatId,
-            text: `✅ *COMPRA APROBADA*\n\nUsuario: \`${userId}\`\nBarajitas: ${qty}\nReferencia: \`${ref}\``,
-            parse_mode: 'Markdown'
-          })
-        });
-      }
-      alert(`Pago ${ref} approved.`);
+
+      alert(`Pago de la referencia ${ref} aprobado exitosamente.`);
       loadUserData();
       loadPendingPayments();
     }
@@ -1293,46 +1111,112 @@
         await STATE.supabase.from('transacciones').update({ estado: 'rechazado' }).eq('referencia', ref);
       } else {
         const localTxs = JSON.parse(localStorage.getItem('local_txs') || '[]');
-        const tx = localTxs.find(t => t.referencia === ref);
-        if (tx) tx.estado = 'rechazado';
+        const target = localTxs.find(t => t.referencia === ref);
+        if (target) target.estado = 'rechazado';
         localStorage.setItem('local_txs', JSON.stringify(localTxs));
       }
+      alert(`Pago ${ref} rechazado.`);
       loadPendingPayments();
     }
 
-    // MÉTRICAS Y CAJA DINÁMICA DE LA PLATAFORMA
-    async function renderFinancialMetrics() {
-      let approvedTxs = [];
+    async function loadPendingWithdrawals() {
+      const tbody = document.getElementById('pendingWithdrawalsTable');
+      tbody.innerHTML = '';
+      let retiros = [];
+
       if (STATE.supabase) {
-        const { data } = await STATE.supabase.from('transacciones').select('*').eq('estado', 'aprobado');
-        approvedTxs = data || [];
+        const { data } = await STATE.supabase.from('retiros').select('*').eq('estado', 'pendiente');
+        retiros = data || [];
       } else {
-        const localTxs = JSON.parse(localStorage.getItem('local_txs') || '[]');
-        approvedTxs = localTxs.filter(t => t.estado === 'aprobado');
+        retiros = JSON.parse(localStorage.getItem('local_retiros') || '[]').filter(r => r.estado === 'pendiente');
       }
 
-      const totalSales = approvedTxs.reduce((sum, t) => sum + parseFloat(t.monto_bs), 0);
-      const rawPlatformProfit = totalSales * 0.30;
-      const userNetValue = totalSales * 0.70;
+      if (retiros.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-500">No hay solicitudes de retiro pendientes.</td></tr>`;
+        return;
+      }
 
-      const withdrawals = JSON.parse(localStorage.getItem('platform_withdrawals') || '[]');
-      const totalWithdrawals = withdrawals.reduce((sum, w) => sum + parseFloat(w.monto_bs), 0);
-      const currentPlatformProfit = rawPlatformProfit - totalWithdrawals;
+      retiros.forEach(r => {
+        const row = document.createElement('tr');
+        row.className = "border-b border-purple-500/10 hover:bg-purple-950/20";
+        row.innerHTML = `
+          <td class="p-3 text-xs">${new Date(r.fecha).toLocaleString()}</td>
+          <td class="p-3 font-mono text-purple-300">${r.usuario_id}</td>
+          <td class="p-3 font-bold">${r.tipo === 'hito' ? `Hito #${r.hito}` : 'Liquidación Total'}</td>
+          <td class="p-3 text-emerald-400 font-bold">Bs. ${r.monto_bs.toFixed(2)} ($${r.monto_usd})</td>
+          <td class="p-3 text-xs font-mono">${r.datos_pago}</td>
+          <td class="p-3 text-center space-x-2">
+            <button onclick="approveWithdrawal('${r.fecha}', '${r.usuario_id}', '${r.tipo}', '${r.hito}', ${r.monto_bs})" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs font-bold">Aprobar</button>
+          </td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
 
-      const rate = STATE.bcvRate || 1;
-      document.getElementById('metricTotalSales').innerText = `Bs. ${totalSales.toFixed(2)} ($${(totalSales/rate).toFixed(2)})`;
-      document.getElementById('metricPlatformProfit').innerText = `Bs. ${currentPlatformProfit.toFixed(2)} ($${(currentPlatformProfit/rate).toFixed(2)})`;
-      document.getElementById('metricUserNetValue').innerText = `Bs. ${userNetValue.toFixed(2)} ($${(userNetValue/rate).toFixed(2)})`;
+    async function approveWithdrawal(fecha, userId, tipo, hito, montoBs) {
+      if (STATE.supabase) {
+        await STATE.supabase.from('retiros').update({ estado: 'completado' }).eq('fecha', fecha);
+        if (tipo === 'hito') {
+          const { data: user } = await STATE.supabase.from('usuarios').select('*').eq('id', userId).single();
+          const claimed = user ? user.claimed_milestones || [] : [];
+          claimed.push(parseInt(hito));
+          await STATE.supabase.from('usuarios').update({ claimed_milestones: claimed }).eq('id', userId);
+        } else {
+          await STATE.supabase.from('usuarios').update({ cantidad_barajitas: 0, saldo_bs: 0, claimed_milestones: [] }).eq('id', userId);
+        }
+      } else {
+        const localRetiros = JSON.parse(localStorage.getItem('local_retiros') || '[]');
+        const target = localRetiros.find(r => r.fecha === fecha);
+        if (target) target.estado = 'completado';
+        localStorage.setItem('local_retiros', JSON.stringify(localRetiros));
+
+        if (tipo === 'hito') {
+          const claimed = JSON.parse(localStorage.getItem(`claimed_milestones_${userId}`) || '[]');
+          claimed.push(parseInt(hito));
+          localStorage.setItem(`claimed_milestones_${userId}`, JSON.stringify(claimed));
+        } else {
+          localStorage.setItem(`stickers_${userId}`, '0');
+          localStorage.setItem(`balance_${userId}`, '0');
+          localStorage.setItem(`claimed_milestones_${userId}`, '[]');
+        }
+      }
+
+      alert('Solicitud de retiro procesada correctamente.');
+      loadUserData();
+      loadPendingWithdrawals();
+    }
+
+    async function renderFinancialMetrics() {
+      let totalVentasBs = 0;
+      if (STATE.supabase) {
+        const { data } = await STATE.supabase.from('transacciones').select('*').eq('estado', 'aprobado');
+        if (data) totalVentasBs = data.reduce((acc, curr) => acc + curr.monto_bs, 0);
+      } else {
+        const txs = JSON.parse(localStorage.getItem('local_txs') || '[]').filter(t => t.estado === 'aprobado');
+        totalVentasBs = txs.reduce((acc, curr) => acc + curr.monto_bs, 0);
+      }
+
+      const totalVentasUSD = STATE.bcvRate > 0 ? (totalVentasBs / STATE.bcvRate).toFixed(2) : '0.00';
+      const userNetBs = totalVentasBs * 0.70;
+      const userNetUSD = STATE.bcvRate > 0 ? (userNetBs / STATE.bcvRate).toFixed(2) : '0.00';
+      const egresosCajaBs = parseFloat(localStorage.getItem('egresos_caja_bs') || '0');
+      const platformProfitBs = (totalVentasBs * 0.30) - egresosCajaBs;
+      const platformProfitUSD = STATE.bcvRate > 0 ? (platformProfitBs / STATE.bcvRate).toFixed(2) : '0.00';
+
+      document.getElementById('metricTotalSales').innerText = `Bs. ${totalVentasBs.toFixed(2)} ($${totalVentasUSD})`;
+      document.getElementById('metricPlatformProfit').innerText = `Bs. ${platformProfitBs.toFixed(2)} ($${platformProfitUSD})`;
+      document.getElementById('metricUserNetValue').innerText = `Bs. ${userNetBs.toFixed(2)} ($${userNetUSD})`;
 
       const ctx = document.getElementById('financialChart').getContext('2d');
-      if (window.myChart) window.myChart.destroy();
-      window.myChart = new Chart(ctx, {
+      if (STATE.financialChart) STATE.financialChart.destroy();
+
+      STATE.financialChart = new Chart(ctx, {
         type: 'doughnut',
         data: {
-          labels: ['Caja Neto Plataforma (30% - Retiros)', 'Valor Neto Usuarios (70%)'],
+          labels: ['Valor Neto Usuarios (70%)', 'Margen Plataforma (30%)'],
           datasets: [{
-            data: [Math.max(0, currentPlatformProfit), userNetValue],
-            backgroundColor: ['#a855f7', '#10b981'],
+            data: [userNetBs, Math.max(0, platformProfitBs)],
+            backgroundColor: ['#10b981', '#a855f7'],
             borderColor: '#0f172a',
             borderWidth: 2
           }]
@@ -1340,131 +1224,106 @@
         options: {
           responsive: true,
           maintainAspectRatio: false,
-          plugins: { legend: { labels: { color: '#e2e8f0' } } }
+          plugins: {
+            legend: { labels: { color: '#e2e8f0' } }
+          }
         }
       });
     }
 
     function registerPlatformWithdrawal(e) {
       e.preventDefault();
-      const amountBs = parseFloat(document.getElementById('withdrawalAmountBs').value);
-      const concept = document.getElementById('withdrawalConcept').value;
-      if (!amountBs || amountBs <= 0) return;
-
-      const withdrawals = JSON.parse(localStorage.getItem('platform_withdrawals') || '[]');
-      withdrawals.push({ monto_bs: amountBs, concepto: concept, fecha: new Date().toISOString() });
-      localStorage.setItem('platform_withdrawals', JSON.stringify(withdrawals));
-
+      const amount = parseFloat(document.getElementById('withdrawalAmountBs').value);
+      const current = parseFloat(localStorage.getItem('egresos_caja_bs') || '0');
+      localStorage.setItem('egresos_caja_bs', current + amount);
+      alert('Egreso registrado exitosamente de la caja de la plataforma.');
       document.getElementById('withdrawalAmountBs').value = '';
       document.getElementById('withdrawalConcept').value = '';
-      alert('Retiro registrado correctamente.');
       renderFinancialMetrics();
     }
 
-    // EXPEDIENTES DE USUARIOS Y BUSCADOR
-    async function loadUserList() {
+    async function renderUserList() {
       const tbody = document.getElementById('userListTable');
       tbody.innerHTML = '';
-      let txs = [];
+      let users = [];
+
       if (STATE.supabase) {
-        const { data } = await STATE.supabase.from('transacciones').select('*');
-        txs = data || [];
+        const { data } = await STATE.supabase.from('usuarios').select('*');
+        users = data || [];
       } else {
-        txs = JSON.parse(localStorage.getItem('local_txs') || '[]');
+        users = [{
+          id: STATE.userId,
+          cantidad_barajitas: STATE.userStickersCount,
+          saldo_bs: STATE.userBalanceBs
+        }];
       }
 
-      const usersMap = {};
-      txs.forEach(t => {
-        if (!usersMap[t.usuario_id]) {
-          usersMap[t.usuario_id] = { id: t.usuario_id, stickers: 0, totalSpentBs: 0 };
-        }
-        if (t.estado === 'aprobado') {
-          usersMap[t.usuario_id].stickers += t.barajitas_qty;
-          usersMap[t.usuario_id].totalSpentBs += parseFloat(t.monto_bs);
-        }
-      });
+      users.forEach(u => {
+        const usdSpent = STATE.bcvRate > 0 ? ((u.saldo_bs / 0.7) / STATE.bcvRate).toFixed(2) : '0.00';
+        const usdNet = STATE.bcvRate > 0 ? (u.saldo_bs / STATE.bcvRate).toFixed(2) : '0.00';
 
-      const rate = STATE.bcvRate || 1;
-      Object.values(usersMap).forEach(u => {
-        const net70Bs = u.totalSpentBs * 0.70;
-        const tr = document.createElement('tr');
-        tr.className = "border-b border-slate-800 hover:bg-slate-900/50";
-        tr.innerHTML = `
-          <td class="p-3 font-mono text-purple-300 font-bold">${u.id}</td>
-          <td class="p-3 font-bold">${u.stickers}</td>
-          <td class="p-3 text-emerald-400 font-bold">Bs. ${u.totalSpentBs.toFixed(2)} <span class="text-xs text-slate-400">($${(u.totalSpentBs/rate).toFixed(2)})</span></td>
-          <td class="p-3 text-blue-400 font-bold">Bs. ${net70Bs.toFixed(2)} <span class="text-xs text-slate-400">($${(net70Bs/rate).toFixed(2)})</span></td>
+        const row = document.createElement('tr');
+        row.className = "border-b border-purple-500/10 hover:bg-purple-950/20";
+        row.innerHTML = `
+          <td class="p-3 font-mono text-purple-300">${u.id}</td>
+          <td class="p-3 font-bold">${u.cantidad_barajitas || 0} / 2000</td>
+          <td class="p-3 font-bold text-slate-300">Bs. ${((u.saldo_bs || 0) / 0.7).toFixed(2)} ($${usdSpent})</td>
+          <td class="p-3 font-bold text-emerald-400">Bs. ${(u.saldo_bs || 0).toFixed(2)} ($${usdNet})</td>
           <td class="p-3 text-center">
-            <button onclick="openUserModal('${u.id}')" class="px-3 py-1 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-bold transition">Ver Expediente</button>
+            <button onclick="openUserModal('${u.id}')" class="px-3 py-1 bg-purple-600 hover:bg-purple-500 text-white rounded text-xs font-bold">Ver Expediente</button>
           </td>
         `;
-        tbody.appendChild(tr);
+        tbody.appendChild(row);
       });
     }
 
     function filterUserLogs() {
-      const filter = document.getElementById('userSearchInput').value.toLowerCase();
+      const q = document.getElementById('userSearchInput').value.toLowerCase();
       const rows = document.querySelectorAll('#userListTable tr');
       rows.forEach(row => {
         const text = row.innerText.toLowerCase();
-        row.style.display = text.includes(filter) ? '' : 'none';
+        row.style.display = text.includes(q) ? '' : 'none';
       });
     }
 
     async function openUserModal(userId) {
       document.getElementById('modalUserTitle').innerText = `Expediente del Usuario: ${userId}`;
       let userTxs = [];
+      let stickersCount = 0;
+      let saldoBs = 0;
+
       if (STATE.supabase) {
-        const { data } = await STATE.supabase.from('transacciones').select('*').eq('usuario_id', userId);
-        userTxs = data || [];
+        const { data: user } = await STATE.supabase.from('usuarios').select('*').eq('id', userId).single();
+        if (user) {
+          stickersCount = user.cantidad_barajitas || 0;
+          saldoBs = user.saldo_bs || 0;
+        }
+        const { data: txs } = await STATE.supabase.from('transacciones').select('*').eq('usuario_id', userId);
+        userTxs = txs || [];
       } else {
-        const localTxs = JSON.parse(localStorage.getItem('local_txs') || '[]');
-        userTxs = localTxs.filter(t => t.usuario_id === userId);
+        stickersCount = parseInt(localStorage.getItem(`stickers_${userId}`) || '0');
+        saldoBs = parseFloat(localStorage.getItem(`balance_${userId}`) || '0');
+        userTxs = JSON.parse(localStorage.getItem('local_txs') || '[]').filter(t => t.usuario_id === userId);
       }
 
-      const approved = userTxs.filter(t => t.estado === 'aprobado');
-      const totalStickers = approved.reduce((s, t) => s + t.barajitas_qty, 0);
-      const totalSpent = approved.reduce((s, t) => s + parseFloat(t.monto_bs), 0);
-      const rate = STATE.bcvRate || 1;
-
-      document.getElementById('modalUserStickers').innerText = totalStickers;
-      document.getElementById('modalUserSpent').innerText = `Bs. ${totalSpent.toFixed(2)} ($${(totalSpent/rate).toFixed(2)})`;
+      document.getElementById('modalUserStickers').innerText = `${stickersCount} / 2000 Barajitas`;
+      const usdSpent = STATE.bcvRate > 0 ? ((saldoBs / 0.7) / STATE.bcvRate).toFixed(2) : '0.00';
+      document.getElementById('modalUserSpent').innerText = `Bs. ${(saldoBs / 0.7).toFixed(2)} ($${usdSpent})`;
 
       const tbody = document.getElementById('modalUserHistoryTable');
       tbody.innerHTML = '';
       userTxs.forEach(t => {
-        const tr = document.createElement('tr');
-        tr.className = "border-b border-slate-800";
-        tr.innerHTML = `
+        const usd = STATE.bcvRate > 0 ? (t.monto_bs / STATE.bcvRate).toFixed(2) : '0.00';
+        const row = document.createElement('tr');
+        row.className = "border-b border-purple-500/10";
+        row.innerHTML = `
           <td class="p-2">${new Date(t.fecha).toLocaleDateString()}</td>
           <td class="p-2 font-bold">${t.barajitas_qty}</td>
-          <td class="p-2 text-emerald-400">Bs. ${parseFloat(t.monto_bs).toFixed(2)}</td>
+          <td class="p-2 text-emerald-400 font-bold">Bs. ${t.monto_bs.toFixed(2)} ($${usd})</td>
           <td class="p-2 font-mono">${t.referencia}</td>
-          <td class="p-2 uppercase text-[10px] font-bold ${t.estado === 'aprobado' ? 'text-emerald-400' : t.estado === 'pendiente' ? 'text-amber-400' : 'text-red-400'}">${t.estado}</td>
+          <td class="p-2"><span class="px-1.5 py-0.5 rounded text-[10px] font-bold ${t.estado === 'aprobado' ? 'bg-emerald-900/60 text-emerald-300' : 'bg-amber-900/60 text-amber-300'}">${t.estado}</span></td>
         `;
-        tbody.appendChild(tr);
-      });
-
-      const ctx = document.getElementById('userIndividualChart').getContext('2d');
-      if (window.userChart) window.userChart.destroy();
-      window.userChart = new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels: approved.map((_, i) => `Compra ${i+1}`),
-          datasets: [{
-            label: 'Barajitas Acumuladas',
-            data: approved.map((t, i) => approved.slice(0, i+1).reduce((sum, item) => sum + item.barajitas_qty, 0)),
-            borderColor: '#a855f7',
-            backgroundColor: 'rgba(168, 85, 247, 0.2)',
-            fill: true,
-            tension: 0.3
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { labels: { color: '#e2e8f0' } } }
-        }
+        tbody.appendChild(row);
       });
 
       document.getElementById('userModal').classList.remove('hidden');
@@ -1474,7 +1333,14 @@
       document.getElementById('userModal').classList.add('hidden');
     }
 
-    function loadConfigForm() {
+    function purgeAllData() {
+      if (confirm('¿ATENCIÓN: Estás a punto de borrar todos los datos locales y reiniciar el sistema por completo?')) {
+        localStorage.clear();
+        location.reload();
+      }
+    }
+
+    function populateConfigForm() {
       document.getElementById('cfgSupabaseUrl').value = STATE.config.supabaseUrl;
       document.getElementById('cfgSupabaseKey').value = STATE.config.supabaseKey;
       document.getElementById('cfgTelegramToken').value = STATE.config.telegramToken;
@@ -1484,35 +1350,19 @@
       document.getElementById('cfgBankCode').value = STATE.config.bankCode;
     }
 
-   function saveAdminConfig(e) {
-    e.preventDefault();
-    STATE.config.supabaseUrl = document.getElementById('cfgSupabaseUrl').value;
-    STATE.config.supabaseKey = document.getElementById('cfgSupabaseKey').value;
-    STATE.config.telegramToken = document.getElementById('cfgTelegramToken').value;
-    STATE.config.telegramChatId = document.getElementById('cfgTelegramChatId').value;
-    STATE.config.bankId = document.getElementById('cfgBankId').value;
-    STATE.config.bankPhone = document.getElementById('cfgBankPhone').value;
-    STATE.config.bankCode = document.getElementById('cfgBankCode').value;
+    function saveAdminConfig(e) {
+      e.preventDefault();
+      localStorage.setItem('cfg_sb_url', document.getElementById('cfgSupabaseUrl').value);
+      localStorage.setItem('cfg_sb_key', document.getElementById('cfgSupabaseKey').value);
+      localStorage.setItem('cfg_tg_token', document.getElementById('cfgTelegramToken').value);
+      localStorage.setItem('cfg_tg_chat', document.getElementById('cfgTelegramChatId').value);
+      localStorage.setItem('cfg_bank_id', document.getElementById('cfgBankId').value);
+      localStorage.setItem('cfg_bank_phone', document.getElementById('cfgBankPhone').value);
+      localStorage.setItem('cfg_bank_code', document.getElementById('cfgBankCode').value);
 
-    localStorage.setItem('cfg_sb_url', STATE.config.supabaseUrl);
-    localStorage.setItem('cfg_sb_key', STATE.config.supabaseKey);
-    localStorage.setItem('cfg_tg_token', STATE.config.telegramToken);
-    localStorage.setItem('cfg_tg_chat', STATE.config.telegramChatId);
-    localStorage.setItem('cfg_bank_id', STATE.config.bankId);
-    localStorage.setItem('cfg_bank_phone', STATE.config.bankPhone);
-    localStorage.setItem('cfg_bank_code', STATE.config.bankCode);
-
-    document.getElementById('idDisplay').innerText = STATE.config.bankId;
-    document.getElementById('phoneDisplay').innerText = STATE.config.bankPhone;
-    document.getElementById('bankDisplay').innerText = STATE.config.bankCode;
-
-    initSupabase();
-    alert('Configuración guardada exitosamente.');
-}
-  function purgeAllData() {
-    if (confirm('⚠️ ¿Estás seguro de que deseas purgar todos los datos del sistema? Esta acción no se puede deshacer.')) {
-      localStorage.clear();
+      alert('Configuración guardada exitosamente.');
       location.reload();
     }
-  }
-</script>
+  </script>
+</body>
+</html>
