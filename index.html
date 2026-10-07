@@ -12,6 +12,8 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- JSZip CDN para extracción de archivos comprimidos de hasta 2000 imágenes -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <style>
     /* Estilos Metalizados Azul y Morado */
     body {
@@ -244,7 +246,7 @@
           </button>
           <button onclick="switchAdminTab('imagenesAdmin')" id="tabAdminImagenes" class="pb-3 font-semibold text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center space-x-2 whitespace-nowrap">
             <i data-lucide="image" class="w-4 h-4"></i>
-            <span>Gestión de Imágenes</span>
+            <span>Gestión Masiva de Imágenes (Hasta 2000)</span>
           </button>
           <button onclick="switchAdminTab('metricas')" id="tabAdminMetricas" class="pb-3 font-semibold text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center space-x-2 whitespace-nowrap">
             <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
@@ -300,35 +302,44 @@
           </div>
         </div>
 
-        <!-- TAB NUEVO: GESTIÓN Y SUBIDA DE IMÁGENES A SUPABASE STORAGE -->
+        <!-- TAB MODIFICADO: GESTIÓN Y SUBIDA MASIVA DE IMÁGENES (HASTA 2000) -->
         <div id="adminContentImagenes" class="hidden space-y-6">
           <div class="bg-slate-950/60 p-5 rounded-xl border border-purple-500/30 space-y-4">
             <div class="border-b border-purple-500/20 pb-3">
               <h3 class="text-base font-bold text-purple-200 flex items-center space-x-2">
                 <i data-lucide="upload-cloud" class="w-5 h-5 text-purple-400"></i>
-                <span>Cargar / Actualizar Barajita en Supabase Storage</span>
+                <span>Carga Masiva de Barajitas a Supabase Storage (Hasta 2000 Imágenes)</span>
               </h3>
-              <p class="text-xs text-slate-400 mt-1">Sube la imagen para el número de cromo seleccionado (Se guardará automáticamente como <code class="text-purple-300 font-mono">[número].jpg</code> en el bucket 'barajitas').</p>
+              <p class="text-xs text-slate-400 mt-1">Sube múltiples imágenes (`1.jpg`, `2.jpg`, ..., `2000.jpg`) o un archivo `.zip` comprimido con todas las imágenes numeradas.</p>
             </div>
 
-            <form onsubmit="uploadStickerImage(event)" class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-              <div>
-                <label class="block text-xs font-semibold text-purple-200 mb-1">Número de Barajita (1 - 2000):</label>
-                <input type="number" id="imgStickerNum" min="1" max="2000" required placeholder="Ej: 1" class="w-full bg-slate-900 border border-purple-500/40 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-purple-400 font-bold">
-              </div>
+            <form onsubmit="uploadStickerImagesBatch(event)" class="space-y-4">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-xs font-semibold text-purple-200 mb-1">Seleccionar Imágenes o Archivo ZIP:</label>
+                  <input type="file" id="imgFileAssetBatch" accept="image/*,application/zip,application/x-zip-compressed" multiple required class="w-full bg-slate-900 border border-purple-500/40 rounded-lg p-2 text-xs text-slate-300 file:mr-2 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-500">
+                  <p class="text-[10px] text-purple-300/70 mt-1">* Los nombres de archivo deben ser el número de cromo (Ej: 1.jpg, 2.png, 1500.jpeg).</p>
+                </div>
 
-              <div>
-                <label class="block text-xs font-semibold text-purple-200 mb-1">Seleccionar Imagen (JPG / PNG):</label>
-                <input type="file" id="imgFileAsset" accept="image/*" required class="w-full bg-slate-900 border border-purple-500/40 rounded-lg p-1.5 text-xs text-slate-300 file:mr-2 file:py-1 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-500">
-              </div>
-
-              <div>
-                <button type="submit" id="btnUploadImg" class="metal-button w-full py-2.5 rounded-lg text-xs font-bold text-white flex items-center justify-center space-x-2">
-                  <i data-lucide="upload" class="w-4 h-4"></i>
-                  <span>Subir a Supabase Storage</span>
-                </button>
+                <div class="flex items-end">
+                  <button type="submit" id="btnUploadImgBatch" class="metal-button w-full py-3 rounded-lg text-xs font-bold text-white flex items-center justify-center space-x-2">
+                    <i data-lucide="upload" class="w-4 h-4"></i>
+                    <span>Iniciar Carga Masiva a Supabase Storage</span>
+                  </button>
+                </div>
               </div>
             </form>
+
+            <!-- Barra de Progreso Masivo -->
+            <div id="uploadProgressContainer" class="hidden space-y-2 pt-2">
+              <div class="flex justify-between text-xs font-bold">
+                <span id="uploadProgressLabel" class="text-purple-300">Procesando lote de imágenes...</span>
+                <span id="uploadProgressCounter" class="text-emerald-400">0 / 0 (0%)</span>
+              </div>
+              <div class="w-full bg-slate-900 rounded-full h-3 overflow-hidden border border-purple-500/30">
+                <div id="uploadProgressBar" class="bg-gradient-to-r from-emerald-500 to-purple-600 h-full w-0 transition-all duration-300"></div>
+              </div>
+            </div>
 
             <div id="uploadStatusMessage" class="hidden p-3 rounded-lg text-xs font-bold"></div>
           </div>
@@ -1010,13 +1021,16 @@
       }
     }
 
-    // SUBIDA DIRECTA DE IMÁGENES HACIA SUPABASE STORAGE
-    async function uploadStickerImage(e) {
+    // SUBIDA MASIVA DE IMÁGENES HACIA SUPABASE STORAGE (HASTA 2000 ARCHIVOS / ZIP)
+    async function uploadStickerImagesBatch(e) {
       e.preventDefault();
-      const stickerNum = document.getElementById('imgStickerNum').value;
-      const fileInput = document.getElementById('imgFileAsset');
-      const btn = document.getElementById('btnUploadImg');
+      const fileInput = document.getElementById('imgFileAssetBatch');
+      const btn = document.getElementById('btnUploadImgBatch');
       const statusMsg = document.getElementById('uploadStatusMessage');
+      const progressContainer = document.getElementById('uploadProgressContainer');
+      const progressBar = document.getElementById('uploadProgressBar');
+      const progressCounter = document.getElementById('uploadProgressCounter');
+      const progressLabel = document.getElementById('uploadProgressLabel');
 
       if (!STATE.supabase) {
         alert('Supabase no está configurado. Por favor ingresa la URL y Anon Key en la pestaña Configuración.');
@@ -1024,40 +1038,106 @@
       }
 
       if (!fileInput.files || fileInput.files.length === 0) {
-        alert('Selecciona un archivo de imagen válido.');
+        alert('Selecciona archivos de imagen o un ZIP.');
         return;
       }
 
-      const file = fileInput.files[0];
-      const fileName = `${stickerNum}.jpg`;
-
       btn.disabled = true;
-      btn.innerText = 'Subiendo Imagen...';
+      btn.innerText = 'Preparando Carga Masiva...';
       statusMsg.classList.add('hidden');
+      progressContainer.classList.remove('hidden');
+      progressBar.style.width = '0%';
+
+      let filesToUpload = []; // { name: '1.jpg', blob: File|Blob }
 
       try {
-        const { data, error } = await STATE.supabase.storage
-          .from('barajitas')
-          .upload(fileName, file, {
-            cacheControl: '3600',
-            upsert: true
-          });
+        const firstFile = fileInput.files[0];
+        
+        // Si el usuario seleccionó un ZIP
+        if (fileInput.files.length === 1 && (firstFile.type.includes('zip') || firstFile.name.endsWith('.zip'))) {
+          progressLabel.innerText = "Descomprimiendo archivo ZIP...";
+          const zip = await JSZip.loadAsync(firstFile);
+          const entries = Object.keys(zip.files);
 
-        if (error) {
-          throw error;
+          for (const filename of entries) {
+            const entry = zip.files[filename];
+            if (!entry.dir && /\.(jpg|jpeg|png|webp)$/i.test(filename)) {
+              const cleanName = filename.split('/').pop();
+              const numMatch = cleanName.match(/^(\d+)\./);
+              if (numMatch) {
+                const stickerNum = parseInt(numMatch[1]);
+                if (stickerNum >= 1 && stickerNum <= 2000) {
+                  const blob = await entry.async('blob');
+                  filesToUpload.push({ name: `${stickerNum}.jpg`, blob: blob });
+                }
+              }
+            }
+          }
+        } else {
+          // Múltiples archivos seleccionados manualmente
+          for (let i = 0; i < fileInput.files.length; i++) {
+            const file = fileInput.files[i];
+            const cleanName = file.name;
+            const numMatch = cleanName.match(/^(\d+)\./);
+            if (numMatch) {
+              const stickerNum = parseInt(numMatch[1]);
+              if (stickerNum >= 1 && stickerNum <= 2000) {
+                filesToUpload.push({ name: `${stickerNum}.jpg`, blob: file });
+              }
+            }
+          }
         }
 
+        if (filesToUpload.length === 0) {
+          throw new Error("No se encontraron imágenes válidas con formato numérico (ej: 1.jpg, 2.jpg) de 1 a 2000.");
+        }
+
+        progressLabel.innerText = "Subiendo imágenes a Supabase Storage...";
+        let completed = 0;
+        let errors = 0;
+        const total = filesToUpload.length;
+
+        // Concurrencia de 5 solicitudes simultáneas para máximo rendimiento
+        const concurrency = 5;
+        const queue = [...filesToUpload];
+
+        const worker = async () => {
+          while (queue.length > 0) {
+            const item = queue.shift();
+            try {
+              const { error } = await STATE.supabase.storage
+                .from('barajitas')
+                .upload(item.name, item.blob, {
+                  cacheControl: '3600',
+                  upsert: true
+                });
+
+              if (error) errors++;
+            } catch (err) {
+              errors++;
+            } finally {
+              completed++;
+              const pct = Math.round((completed / total) * 100);
+              progressBar.style.width = `${pct}%`;
+              progressCounter.innerText = `${completed} / ${total} (${pct}%)`;
+            }
+          }
+        };
+
+        const workers = Array.from({ length: Math.min(concurrency, queue.length) }, () => worker());
+        await Promise.all(workers);
+
         statusMsg.className = "p-3 rounded-lg text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 block";
-        statusMsg.innerText = `✅ Imagen para la Barajita #${stickerNum} subida con éxito a Supabase Storage (${fileName}).`;
+        statusMsg.innerText = `✅ Carga Masiva Finalizada: ${completed - errors} imágenes subidas con éxito.${errors > 0 ? ` (${errors} fallaron)` : ''}`;
         fileInput.value = '';
-        document.getElementById('imgStickerNum').value = '';
+
       } catch (err) {
-        console.error('Error al subir imagen:', err);
+        console.error('Error en carga masiva:', err);
         statusMsg.className = "p-3 rounded-lg text-xs font-bold bg-red-500/20 text-red-300 border border-red-500/40 block";
-        statusMsg.innerText = `❌ Error al subir imagen: ${err.message || 'Asegúrate de que el bucket "barajitas" exista y sea público.'}`;
+        statusMsg.innerText = `❌ Error en Carga Masiva: ${err.message || 'Error inesperado procesando las imágenes.'}`;
       } finally {
         btn.disabled = false;
-        btn.innerHTML = `<i data-lucide="upload" class="w-4 h-4"></i><span>Subir a Supabase Storage</span>`;
+        btn.innerHTML = `<i data-lucide="upload" class="w-4 h-4"></i><span>Iniciar Carga Masiva a Supabase Storage</span>`;
         lucide.createIcons();
       }
     }
