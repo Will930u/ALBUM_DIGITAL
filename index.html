@@ -861,7 +861,7 @@
         milestone: STATE.selectedMilestone,
         monto_bs: bsVal,
         monto_usd: usdVal,
-        datos_pago: `${bank} | ${phone} \vert{}${id}`,
+        datos_pago: `${bank} | ${phone} | ${id}`,
         estado: 'pendiente',
         fecha: new Date().toISOString()
       };
@@ -1484,9 +1484,35 @@
       document.getElementById('cfgBankCode').value = STATE.config.bankCode;
     }
 
-    function saveAdminConfig(e) {
-      e.preventDefault();
-      STATE.config.supabaseUrl = document.getElementById('cfgSupabaseUrl').value;
-      STATE.config.supabaseKey = document.getElementById('cfgSupabaseKey').value;
-      STATE.config.telegramToken = document.getElementById('cfgTelegramToken').value;
-      STATE.config.telegram
+   function saveAdminConfig(e) {
+    e.preventDefault();
+    STATE.config.supabaseUrl = document.getElementById('cfgSupabaseUrl').value;
+    STATE.config.supabaseKey = document.getElementById('cfgSupabaseKey').value;
+    STATE.config.telegramToken = document.getElementById('cfgTelegramToken').value;
+    STATE.config.telegramChatId = document.getElementById('cfgTelegramChatId').value;
+    STATE.config.bankId = document.getElementById('cfgBankId').value;
+    STATE.config.bankPhone = document.getElementById('cfgBankPhone').value;
+    STATE.config.bankCode = document.getElementById('cfgBankCode').value;
+
+    localStorage.setItem('cfg_sb_url', STATE.config.supabaseUrl);
+    localStorage.setItem('cfg_sb_key', STATE.config.supabaseKey);
+    localStorage.setItem('cfg_tg_token', STATE.config.telegramToken);
+    localStorage.setItem('cfg_tg_chat', STATE.config.telegramChatId);
+    localStorage.setItem('cfg_bank_id', STATE.config.bankId);
+    localStorage.setItem('cfg_bank_phone', STATE.config.bankPhone);
+    localStorage.setItem('cfg_bank_code', STATE.config.bankCode);
+
+    document.getElementById('idDisplay').innerText = STATE.config.bankId;
+    document.getElementById('phoneDisplay').innerText = STATE.config.bankPhone;
+    document.getElementById('bankDisplay').innerText = STATE.config.bankCode;
+
+    initSupabase();
+    alert('Configuración guardada exitosamente.');
+}
+  function purgeAllData() {
+    if (confirm('⚠️ ¿Estás seguro de que deseas purgar todos los datos del sistema? Esta acción no se puede deshacer.')) {
+      localStorage.clear();
+      location.reload();
+    }
+  }
+</script>
