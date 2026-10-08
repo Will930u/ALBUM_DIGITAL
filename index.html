@@ -775,10 +775,10 @@
         const usdVal = (totalBs / (STATE.bcvRate || 1)).toFixed(2);
         const msg = `🛒 *NUEVA SOLICITUD DE COMPRA*\n\n` +
                     `👤 *Usuario:* \`${STATE.userId}\`\n` +
-                    `🎴 *Barajitas:* ${qty}\n` +
-                    `💰 *Monto:* Bs. ${totalBs.toFixed(2)} ($${usdVal})\n` +
-                    `🔢 *Referencia:* \`${ref}\`\n` +
-                    `📅 *Fecha:* ${new Date().toLocaleString()}`;
+                    `📦 *Barajitas:* ${qty}\n` +
+                    `💵 *Monto:* Bs. ${totalBs.toFixed(2)} ($${usdVal})\n` +
+                    `📑 *Referencia:* \`${ref}\`\n` +
+                    `🕒 *Fecha:* ${new Date().toLocaleString()}`;
         try {
           await fetch(`https://api.telegram.org/bot${STATE.config.telegramToken}/sendMessage`, {
             method: 'POST',
@@ -888,11 +888,11 @@
       }
 
       if (STATE.config.telegramToken && STATE.config.telegramChatId) {
-        const msg = `💸 *SOLICITUD DE PREMIO HITO ($200)*\n\n` +
+        const msg = `🏆 *SOLICITUD DE PREMIO HITO ($200)*\n\n` +
                     `👤 *Usuario:* \`${STATE.userId}\`\n` +
-                    `🎴 *Hito:* Barajita #${STATE.selectedMilestone}\n` +
-                    `💰 *Premio:* $${usdVal} USD (Bs.${bsVal})\n` +
-                    `🏦 *Pago Móvil:* ${bank} / ${phone} /${id}`;
+                    `🎯 *Hito:* Barajita #${STATE.selectedMilestone}\n` +
+                    `💵 *Premio:* $${usdVal} USD (Bs.${bsVal})\n` +
+                    `📱 *Pago Móvil:* ${bank} / ${phone} /${id}`;
         try {
           await fetch(`https://api.telegram.org/bot${STATE.config.telegramToken}/sendMessage`, {
             method: 'POST',
@@ -949,10 +949,10 @@
       }
 
       if (STATE.config.telegramToken && STATE.config.telegramChatId) {
-        const msg = `🔴 *SOLICITUD DE LIQUIDACIÓN TOTAL (VALOR NETO)*\n\n` +
+        const msg = `🚨 *SOLICITUD DE LIQUIDACIÓN TOTAL (VALOR NETO)*\n\n` +
                     `👤 *Usuario:* \`${STATE.userId}\`\n` +
                     `💰 *Monto Total:* Bs. ${STATE.userBalanceBs.toFixed(2)} ($${usdVal} USD)\n` +
-                    `🏦 *Pago Móvil:* ${bank} / ${phone} /${id}\n` +
+                    `📱 *Pago Móvil:* ${bank} / ${phone} /${id}\n` +
                     `⚠️ *Acción:* Vaciar álbum e ir a cero al aprobar.`;
         try {
           await fetch(`https://api.telegram.org/bot${STATE.config.telegramToken}/sendMessage`, {
@@ -1130,7 +1130,7 @@
         await Promise.all(workers);
 
         statusMsg.className = "p-3 rounded-lg text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 block";
-        statusMsg.innerText = `✅ Carga Masiva Finalizada: ${completed - errors} imágenes subidas con éxito.${errors > 0 ? ` (${errors} fallaron)` : ''}`;
+        statusMsg.innerText = `✔️ Carga Masiva Finalizada: ${completed - errors} imágenes subidas con éxito.${errors > 0 ? ` (${errors} fallaron)` : ''}`;
         fileInput.value = '';
 
       } catch (err) {
@@ -1251,10 +1251,10 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               chat_id: STATE.config.telegramChatId,
-              text: `🔴 *SOLICITUD DE LIQUIDACIÓN TOTAL APAGADA*\n\n` +
+              text: `🚨 *SOLICITUD DE LIQUIDACIÓN TOTAL PAGADA*\n\n` +
                     `👤 *Usuario:* \`${userId}\`\n` +
                     `✅ *Estado:* Pagada con éxito\n` +
-                    `🔢 *Número de Referencia:* \`${refPago}\``,
+                    `📑 *Número de Referencia:* \`${refPago}\``,
               parse_mode: 'Markdown'
             })
           });
@@ -1316,10 +1316,10 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               chat_id: STATE.config.telegramChatId,
-              text: `💸 *SOLICITUD DE PREMIO HITO #${milestone} PAGADA*\n\n` +
+              text: `🏆 *SOLICITUD DE PREMIO HITO #${milestone} PAGADA*\n\n` +
                     `👤 *Usuario:* \`${userId}\`\n` +
                     `✅ *Estado:* Pagada con éxito\n` +
-                    `🔢 *Número de Referencia:* \`${refPago}\``,
+                    `📑 *Número de Referencia:* \`${refPago}\``,
               parse_mode: 'Markdown'
             })
           });
@@ -1365,7 +1365,7 @@
           })
         });
       }
-      alert(`Pago ${ref} approved.`);
+      alert(`Pago ${ref} aprobado.`);
       loadUserData();
       loadPendingPayments();
     }
@@ -1556,6 +1556,7 @@
       document.getElementById('userModal').classList.add('hidden');
     }
 
+    // CONFIGURACIÓN Y PURGA DE DATOS
     function loadConfigForm() {
       document.getElementById('cfgSupabaseUrl').value = STATE.config.supabaseUrl;
       document.getElementById('cfgSupabaseKey').value = STATE.config.supabaseKey;
@@ -1568,13 +1569,13 @@
 
     function saveAdminConfig(e) {
       e.preventDefault();
-      STATE.config.supabaseUrl = document.getElementById('cfgSupabaseUrl').value;
-      STATE.config.supabaseKey = document.getElementById('cfgSupabaseKey').value;
-      STATE.config.telegramToken = document.getElementById('cfgTelegramToken').value;
-      STATE.config.telegramChatId = document.getElementById('cfgTelegramChatId').value;
-      STATE.config.bankId = document.getElementById('cfgBankId').value;
-      STATE.config.bankPhone = document.getElementById('cfgBankPhone').value;
-      STATE.config.bankCode = document.getElementById('cfgBankCode').value;
+      STATE.config.supabaseUrl = document.getElementById('cfgSupabaseUrl').value.trim();
+      STATE.config.supabaseKey = document.getElementById('cfgSupabaseKey').value.trim();
+      STATE.config.telegramToken = document.getElementById('cfgTelegramToken').value.trim();
+      STATE.config.telegramChatId = document.getElementById('cfgTelegramChatId').value.trim();
+      STATE.config.bankId = document.getElementById('cfgBankId').value.trim();
+      STATE.config.bankPhone = document.getElementById('cfgBankPhone').value.trim();
+      STATE.config.bankCode = document.getElementById('cfgBankCode').value.trim();
 
       localStorage.setItem('cfg_sb_url', STATE.config.supabaseUrl);
       localStorage.setItem('cfg_sb_key', STATE.config.supabaseKey);
@@ -1584,19 +1585,21 @@
       localStorage.setItem('cfg_bank_phone', STATE.config.bankPhone);
       localStorage.setItem('cfg_bank_code', STATE.config.bankCode);
 
+      document.getElementById('bankDisplay').innerText = `${STATE.config.bankCode}`;
       document.getElementById('idDisplay').innerText = STATE.config.bankId;
       document.getElementById('phoneDisplay').innerText = STATE.config.bankPhone;
-      document.getElementById('bankDisplay').innerText = STATE.config.bankCode;
 
       initSupabase();
       alert('Configuración guardada exitosamente.');
     }
 
-    function purgeAllData() {
-      if (confirm('⚠️ ¿Estás seguro de que deseas purgar todos los datos del sistema? Esta acción no se puede deshacer.')) {
-        localStorage.clear();
-        location.reload();
-      }
+    async function purgeAllData() {
+      const confirmPurge = confirm('⚠️ ¿ESTÁS SEGURO DE PURGAR TODO EL SISTEMA?\nSe eliminarán los registros locales y del usuario actual.');
+      if (!confirmPurge) return;
+
+      localStorage.clear();
+      alert('Sistema reiniciado localmente.');
+      location.reload();
     }
   </script>
 </body>
