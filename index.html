@@ -669,7 +669,7 @@
           STATE.userBalanceBs = data.saldo_bs || 0;
           STATE.claimedMilestones = data.claimed_milestones || [];
         }
-        const { data: pendingData } = await STATE.supabase.from('retiros_premios').select('id').eq('usuario_id', STATE.userId).eq('estado', 'pendiente');
+        const { data: pendingData } = await STATE.supabase.from('retiros').select('id').eq('usuario_id', STATE.userId).eq('estado', 'pendiente');
         if (pendingData && pendingData.length > 0) {
           hasPending = true;
         }
@@ -907,7 +907,7 @@
       };
 
       if (STATE.supabase) {
-        await STATE.supabase.from('retiros_premios').insert([withdrawalData]);
+        await STATE.supabase.from('retiros').insert([withdrawalData]);
       } else {
         const localW = JSON.parse(localStorage.getItem('local_withdrawals') || '[]');
         localW.push(withdrawalData);
@@ -974,7 +974,7 @@
       };
 
       if (STATE.supabase) {
-        await STATE.supabase.from('retiros_premios').insert([withdrawalData]);
+        await STATE.supabase.from('retiros').insert([withdrawalData]);
       } else {
         const localW = JSON.parse(localStorage.getItem('local_withdrawals') || '[]');
         localW.push(withdrawalData);
@@ -1216,7 +1216,7 @@
       tbody.innerHTML = '';
       let pending = [];
       if (STATE.supabase) {
-        const { data } = await STATE.supabase.from('retiros_premios').select('*').eq('estado', 'pendiente');
+        const { data } = await STATE.supabase.from('retiros').select('*').eq('estado', 'pendiente');
         pending = data || [];
       } else {
         const localW = JSON.parse(localStorage.getItem('local_withdrawals') || '[]');
@@ -1256,7 +1256,7 @@
 
       if (tipo === 'liquidacion_total') {
         if (STATE.supabase) {
-          await STATE.supabase.from('retiros_premios').update({ estado: 'aprobado', referencia_pago: refPago }).eq('usuario_id', userId).eq('tipo', 'liquidacion_total').eq('estado', 'pendiente');
+          await STATE.supabase.from('retiros').update({ estado: 'aprobado', referencia_pago: refPago }).eq('usuario_id', userId).eq('tipo', 'liquidacion_total').eq('estado', 'pendiente');
           await STATE.supabase.from('usuarios').update({ cantidad_barajitas: 0, saldo_bs: 0, claimed_milestones: [] }).eq('id', userId);
         } else {
           const localW = JSON.parse(localStorage.getItem('local_withdrawals') || '[]');
@@ -1294,7 +1294,7 @@
         alert(`${msgAprobacion}\n\nÁlbum del usuario vaciado a 0.`);
       } else {
         if (STATE.supabase) {
-          await STATE.supabase.from('retiros_premios').update({ estado: 'aprobado', referencia_pago: refPago }).eq('usuario_id', userId).eq('milestone', milestone).eq('estado', 'pendiente');
+          await STATE.supabase.from('retiros').update({ estado: 'aprobado', referencia_pago: refPago }).eq('usuario_id', userId).eq('milestone', milestone).eq('estado', 'pendiente');
           const { data: user } = await STATE.supabase.from('usuarios').select('*').eq('id', userId).single();
           const currentClaimed = user && user.claimed_milestones ? user.claimed_milestones : [];
           if (!currentClaimed.includes(milestone)) currentClaimed.push(milestone);
@@ -1624,7 +1624,7 @@
 
       if (STATE.supabase) {
         await STATE.supabase.from('transacciones').delete().neq('usuario_id', '');
-        await STATE.supabase.from('retiros_premios').delete().neq('usuario_id', '');
+        await STATE.supabase.from('retiros').delete().neq('usuario_id', '');
         await STATE.supabase.from('usuarios').delete().neq('id', '');
       }
 
