@@ -67,6 +67,8 @@
       border-radius: 4px;
     }
   </style>
+  <!-- SDK Oficial de Telegram para Mini Apps -->
+<script src="https://telegram.org"></script>
 </head>
 <body class="flex flex-col min-h-screen">
   <!-- CABECERA PRINCIPAL / NAVEGACIÓN -->
@@ -550,6 +552,83 @@
     </div>
   </main>
   <script>
+    // 1. Inicializar la Mini App de Telegram
+const tg = window.Telegram.WebApp;
+tg.ready();
+tg.expand(); // Hace que la app se abra en pantalla completa
+
+// Variables globales para guardar los datos del usuario actual
+let usuarioTelegramId = null;
+let usuarioTelegramNombre = "";
+
+// 2. Capturar datos del usuario al ingresar
+if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+    const user = tg.initDataUnsafe.user;
+    usuarioTelegramId = user.id; // Su ID único de Telegram
+    usuarioTelegramNombre = user.first_name; // Su nombre en Telegram
+    const usuarioTelegramUsername = user.username || 'sin_username';
+
+    console.log(`Usuario detectado: ${usuarioTelegramNombre} (${usuarioTelegramId})`);
+
+    // 3. Ejecutar el Registro o Inicio de Sesión Automático en Supabase
+    autoRegistroTelegram(usuarioTelegramId, usuarioTelegramNombre, usuarioTelegramUsername);
+} else {
+    console.log("No estás abriendo la app desde Telegram. Usando modo de pruebas.");
+    // Aquí puedes asignar un ID de prueba para cuando programes desde la PC
+    usuarioTelegramId = 123456789; 
+    usuarioTelegramNombre = "Usuario Prueba";
+}
+
+// 4. Función que conecta con tu Base de Datos en Supabase
+async function autoRegistroTelegram(id, nombre, username) {
+    try {
+        // NOTA: Reemplaza 'supabase' por el nombre de la variable cliente que ya usas en tu código
+        
+        // Primero verificamos si el usuario ya existe en tu tabla
+        let { data: usuarioExistente, error: errorBusqueda } = await supabase
+            .from('usuarios') // Asegúrate de tener una tabla llamada 'usuarios'
+            .select('*')
+            .eq('telegram_id', id)
+            .single();
+
+        if (errorBusqueda && errorBusqueda.code === 'PGRST116') {
+            // El usuario no existe (código PGRST116), lo registramos automáticamente
+            console.log("Usuario nuevo detectado. Registrando en Supabase...");
+            
+            let { data: nuevoUsuario, error: errorInsercion } = await supabase
+                .from('usuarios')
+                .insert([
+                    { 
+                        telegram_id: id, 
+                        nombre: nombre, 
+                        username: username,
+                        barajitas_total: 0, // Valores iniciales para tu álbum
+                        balance_usd: 0.00
+                    }
+                ])
+                .select()
+                .single();
+
+            if (errorInsercion) throw errorInsercion;
+            console.log("¡Registro automático exitoso!", nuevoUsuario);
+            
+            // Aquí puedes llamar a la función de tu código que carga el progreso del álbum
+            cargarProgresoAlbum(id); 
+
+        } else if (usuarioExistente) {
+            // El usuario ya existía, iniciamos su sesión cargando sus datos
+            console.log("Bienvenido de vuelta:", usuarioExistente.nombre);
+            
+            // Aquí enlazas con tus funciones actuales para pintar el progreso en tu HTML
+            // Ejemplo ficticio: actualizarInterfazUsuario(usuarioExistente);
+            cargarProgresoAlbum(id);
+        }
+
+    } catch (err) {
+        console.error("Error en el proceso de registro automático:", err.message);
+    }
+}
+
     // Configuración de conexión al Backend
     const API_URL = "https://album-digital.onrender.com";
     const STATE = {
@@ -1618,6 +1697,98 @@
       initSupabase();
       alert('Configuración guardada exitosamente.');
     }
+    // ==========================================
+// REGISTRO AUTOMÁTICO DE TELEGRAM MINI APP
+// ==========================================
+const tg = window.Telegram.WebApp;
+tg.ready();
+tg.expand();
+
+let usuarioTelegramId = null;
+let usuarioTelegramNombre = "";
+
+// Función que se ejecuta automáticamente al cargar la página
+async function verificarUsuarioTelegram() {
+    if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+        const user = tg.initDataUnsafe.user;
+        usuarioTelegramId = user.id;
+        usuarioTelegramNombre = user.first_name;
+        const usuarioTelegramUsername = user.username || 'sin_username';
+
+        console.log(`Usuario Telegram: ${usuarioTelegramNombre} (${usuarioTelegramId})`);
+
+        // Esperar un momento breve para asegurar que initSupabase() haya terminado
+        setTimeout(async () => {
+            if (!STATE.supabase) {
+                console.error("Supabase no se ha inicializado todavía.");
+                return;
+            }
+            await autoRegistroSupabase(usuarioTelegramId, usuarioTelegramNombre, usuarioTelegramUsername);
+        }, 1000);
+
+    } else {
+        console.log("Modo de pruebas: No se detectó Telegram.");
+        // ID de pruebas para cuando uses el navegador de la PC
+        usuarioTelegramId = 123456789;
+        usuarioTelegramNombre = "Usuario Prueba";
+    }
+}
+
+async function autoRegistroSupabase(id, nombre, username) {
+    try {
+        // Convertimos el ID numérico de Telegram a texto para tu columna 'id'
+        const idTexto = String(id);
+
+        // 1. Buscamos si el usuario ya existe usando tu columna 'id'
+        let { data: usuarioExistente, error: errorBusqueda } = await STATE.supabase
+            .from('usuarios')
+            .select('*')
+            .eq('id', idTexto)
+            .maybeSingle(); 
+
+        if (!usuarioExistente) {
+            console.log("Usuario nuevo. Registrando en Supabase con sus columnas reales...");
+            
+            // 2. Si no existe, lo insertamos usando los nombres exactos de tus columnas
+            let { data: nuevoUsuario, error: errorInsercion } = await STATE.supabase
+                .from('usuarios')
+                .insert([
+                    { 
+                        id: idTexto,       // Tu columna 'id' (text) recibe el ID de Telegram
+                        nombre: nombre,   // Tu columna 'nombre' (text)
+                        saldo_usd: 0.00   // Tu columna 'saldo_usd' (numeric) inicia en cero
+                    }
+                ])
+                .select()
+                .single();
+
+            if (errorInsercion) throw errorInsercion;
+            console.log("¡Registrado con éxito en Supabase!", nuevoUsuario);
+            
+            // Guardamos el usuario en el estado global para que el álbum sepa quién eres
+            STATE.usuarioActual = nuevoUsuario;
+
+        } else {
+            console.log("Bienvenido de nuevo:", usuarioExistente.nombre);
+            
+            // Guardamos el usuario existente en el estado global
+            STATE.usuarioActual = usuarioExistente;
+        }
+
+        // 3. Opcional: Si tienes una función que dibuja el álbum, puedes llamarla aquí abajo
+        // para que muestre las barajitas de STATE.usuarioActual.id
+
+    } catch (err) {
+        console.error("Error en autoRegistroSupabase:", err.message);
+    }
+}
+
+// Ejecutar la verificación al iniciar el documento
+document.addEventListener("DOMContentLoaded", () => {
+    verificarUsuarioTelegram();
+});
+// ==========================================
+
 
     async function purgeAllData() {
       if (!confirm("⚠️ ¿Estás absolutamente seguro de ejecutar una PURGA TOTAL?\nSe borrarán todas las transacciones, usuarios, registros de local storage y datos de prueba.")) return;
