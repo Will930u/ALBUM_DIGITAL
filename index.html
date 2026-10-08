@@ -239,7 +239,7 @@
             <i data-lucide="clock" class="w-4 h-4"></i>
             <span>Pagos Pendientes</span>
           </button>
-          <button onclick="switchAdminTab('retirosAdmin')" id="tabAdminRetiros" class="pb-3 font-semibold text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center space-x-2 whitespace-nowrap">
+          <button onclick="switchAdminTab('retiros_premiosAdmin')" id="tabAdminretiros_premios" class="pb-3 font-semibold text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center space-x-2 whitespace-nowrap">
             <i data-lucide="arrow-down-circle" class="w-4 h-4"></i>
             <span>Solicitudes de Retiro</span>
           </button>
@@ -281,8 +281,8 @@
           </div>
         </div>
 
-        <!-- TAB RETIROS SOLICITADOS -->
-        <div id="adminContentRetiros" class="hidden space-y-4">
+        <!-- TAB retiros_premios SOLICITADOS -->
+        <div id="adminContentretiros_premios" class="hidden space-y-4">
           <h3 class="text-sm font-bold text-amber-300">Solicitudes de Retiro (Hito $200 vs Liquidación Total)</h3>
           <div class="overflow-x-auto">
             <table class="w-full text-left text-sm text-slate-300">
@@ -352,7 +352,7 @@
               <p id="metricTotalSales" class="text-xl font-bold text-blue-400 mt-1">Bs. 0.00 ($0.00)</p>
             </div>
             <div class="bg-slate-950/60 p-4 rounded-xl border border-purple-500/20 text-center">
-              <span class="text-xs text-slate-400">Caja Neto Plataforma (30% - Retiros)</span>
+              <span class="text-xs text-slate-400">Caja Neto Plataforma (30% - retiros_premios)</span>
               <p id="metricPlatformProfit" class="text-xl font-bold text-purple-400 mt-1">Bs. 0.00 ($0.00)</p>
             </div>
             <div class="bg-slate-950/60 p-4 rounded-xl border border-purple-500/20 text-center">
@@ -669,7 +669,7 @@
           STATE.userBalanceBs = data.saldo_bs || 0;
           STATE.claimedMilestones = data.claimed_milestones || [];
         }
-        const { data: pendingData } = await STATE.supabase.from('retiros').select('id').eq('usuario_id', STATE.userId).eq('estado', 'pendiente');
+        const { data: pendingData } = await STATE.supabase.from('retiros_premios').select('id').eq('usuario_id', STATE.userId).eq('estado', 'pendiente');
         if (pendingData && pendingData.length > 0) {
           hasPending = true;
         }
@@ -907,7 +907,7 @@
       };
 
       if (STATE.supabase) {
-        await STATE.supabase.from('retiros').insert([withdrawalData]);
+        await STATE.supabase.from('retiros_premios').insert([withdrawalData]);
       } else {
         const localW = JSON.parse(localStorage.getItem('local_withdrawals') || '[]');
         localW.push(withdrawalData);
@@ -974,7 +974,7 @@
       };
 
       if (STATE.supabase) {
-        await STATE.supabase.from('retiros').insert([withdrawalData]);
+        await STATE.supabase.from('retiros_premios').insert([withdrawalData]);
       } else {
         const localW = JSON.parse(localStorage.getItem('local_withdrawals') || '[]');
         localW.push(withdrawalData);
@@ -1017,14 +1017,14 @@
 
     function switchAdminTab(tab) {
       document.getElementById('adminContentPagos').classList.add('hidden');
-      document.getElementById('adminContentRetiros').classList.add('hidden');
+      document.getElementById('adminContentretiros_premios').classList.add('hidden');
       document.getElementById('adminContentImagenes').classList.add('hidden');
       document.getElementById('adminContentMetricas').classList.add('hidden');
       document.getElementById('adminContentUsuarios').classList.add('hidden');
       document.getElementById('adminContentConfig').classList.add('hidden');
 
       document.getElementById('tabAdminPagos').className = "pb-3 font-semibold text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center space-x-2 whitespace-nowrap";
-      document.getElementById('tabAdminRetiros').className = "pb-3 font-semibold text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center space-x-2 whitespace-nowrap";
+      document.getElementById('tabAdminretiros_premios').className = "pb-3 font-semibold text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center space-x-2 whitespace-nowrap";
       document.getElementById('tabAdminImagenes').className = "pb-3 font-semibold text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center space-x-2 whitespace-nowrap";
       document.getElementById('tabAdminMetricas').className = "pb-3 font-semibold text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center space-x-2 whitespace-nowrap";
       document.getElementById('tabAdminUsuarios').className = "pb-3 font-semibold text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center space-x-2 whitespace-nowrap";
@@ -1034,9 +1034,9 @@
         document.getElementById('adminContentPagos').classList.remove('hidden');
         document.getElementById('tabAdminPagos').className = "pb-3 font-semibold text-sm border-b-2 border-purple-500 text-purple-300 flex items-center space-x-2 whitespace-nowrap";
         loadPendingPayments();
-      } else if (tab === 'retirosAdmin') {
-        document.getElementById('adminContentRetiros').classList.remove('hidden');
-        document.getElementById('tabAdminRetiros').className = "pb-3 font-semibold text-sm border-b-2 border-purple-500 text-purple-300 flex items-center space-x-2 whitespace-nowrap";
+      } else if (tab === 'retiros_premiosAdmin') {
+        document.getElementById('adminContentretiros_premios').classList.remove('hidden');
+        document.getElementById('tabAdminretiros_premios').className = "pb-3 font-semibold text-sm border-b-2 border-purple-500 text-purple-300 flex items-center space-x-2 whitespace-nowrap";
         loadPendingWithdrawals();
       } else if (tab === 'imagenesAdmin') {
         document.getElementById('adminContentImagenes').classList.remove('hidden');
@@ -1216,7 +1216,7 @@
       tbody.innerHTML = '';
       let pending = [];
       if (STATE.supabase) {
-        const { data } = await STATE.supabase.from('retiros').select('*').eq('estado', 'pendiente');
+        const { data } = await STATE.supabase.from('retiros_premios').select('*').eq('estado', 'pendiente');
         pending = data || [];
       } else {
         const localW = JSON.parse(localStorage.getItem('local_withdrawals') || '[]');
@@ -1256,7 +1256,7 @@
 
       if (tipo === 'liquidacion_total') {
         if (STATE.supabase) {
-          await STATE.supabase.from('retiros').update({ estado: 'aprobado', referencia_pago: refPago }).eq('usuario_id', userId).eq('tipo', 'liquidacion_total').eq('estado', 'pendiente');
+          await STATE.supabase.from('retiros_premios').update({ estado: 'aprobado', referencia_pago: refPago }).eq('usuario_id', userId).eq('tipo', 'liquidacion_total').eq('estado', 'pendiente');
           await STATE.supabase.from('usuarios').update({ cantidad_barajitas: 0, saldo_bs: 0, claimed_milestones: [] }).eq('id', userId);
         } else {
           const localW = JSON.parse(localStorage.getItem('local_withdrawals') || '[]');
@@ -1294,7 +1294,7 @@
         alert(`${msgAprobacion}\n\nÁlbum del usuario vaciado a 0.`);
       } else {
         if (STATE.supabase) {
-          await STATE.supabase.from('retiros').update({ estado: 'aprobado', referencia_pago: refPago }).eq('usuario_id', userId).eq('milestone', milestone).eq('estado', 'pendiente');
+          await STATE.supabase.from('retiros_premios').update({ estado: 'aprobado', referencia_pago: refPago }).eq('usuario_id', userId).eq('milestone', milestone).eq('estado', 'pendiente');
           const { data: user } = await STATE.supabase.from('usuarios').select('*').eq('id', userId).single();
           const currentClaimed = user && user.claimed_milestones ? user.claimed_milestones : [];
           if (!currentClaimed.includes(milestone)) currentClaimed.push(milestone);
@@ -1439,7 +1439,7 @@
       window.myChart = new Chart(ctx, {
         type: 'doughnut',
         data: {
-          labels: ['Caja Neto Plataforma (30% - Retiros)', 'Valor Neto Usuarios (70%)'],
+          labels: ['Caja Neto Plataforma (30% - retiros_premios)', 'Valor Neto Usuarios (70%)'],
           datasets: [{
             data: [Math.max(0, currentPlatformProfit), userNetValue],
             backgroundColor: ['#a855f7', '#10b981'],
@@ -1624,7 +1624,7 @@
 
       if (STATE.supabase) {
         await STATE.supabase.from('transacciones').delete().neq('usuario_id', '');
-        await STATE.supabase.from('retiros').delete().neq('usuario_id', '');
+        await STATE.supabase.from('retiros_premios').delete().neq('usuario_id', '');
         await STATE.supabase.from('usuarios').delete().neq('id', '');
       }
 
