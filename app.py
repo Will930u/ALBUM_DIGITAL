@@ -82,9 +82,34 @@ def telegram_webhook():
 
     return jsonify({"status": "received"}), 200
 
+@app.route("/api/sincronizar-usuario", methods=["POST"])
+def sincronizar_usuario():
+    """Registra o actualiza los datos del usuario en Supabase al abrir la Mini App."""
+    data = request.get_json(silent=True) or {}
+    
+    usuario_id = data.get("usuario_id")
+    nombre = data.get("nombre", "Usuario Telegram")
+
+    if not usuario_id:
+        return jsonify({"status": "error", "message": "Falta el ID del usuario"}), 400
+
+    if supabase_client:
+        try:
+            # UPSERT: Inserta si no existe, actualiza si ya existe
+            res = supabase_client.table("usuarios").upsert({
+                "id": str(usuario_id),
+                "nombre": nombre
+            }).execute()
+            return jsonify({"status": "success", "data": res.data}), 200
+        except Exception as e:
+            print(f"Error registrando usuario en Supabase: {e}")
+            return jsonify({"status": "error", "details": str(e)}), 500
+
+    return jsonify({"status": "warning", "message": "Supabase no está configurado"}), 200
+
 @app.route("/api/notificar-compra", methods=["POST"])
 def notificar_compra():
-    """Endpoint para recibir compras desde el frontend y notificar al admin por Telegram."""
+    """Endpoint para registrar compras en Supabase y notificar al admin por Telegram."""
     data = request.get_json(silent=True) or {}
     
     usuario_id = data.get("usuario_id")
@@ -96,11 +121,40 @@ def notificar_compra():
     if not all([usuario_id, barajitas_qty, monto_bs, referencia]):
         return jsonify({"status": "error", "message": "Faltan campos requeridos"}), 400
 
+    # 1. Asegurar que el usuario existe en Supabase antes de vincular la compra
+    if supabase_client:
+        try:
+            supabase_client.table("usuarios").upsert({
+                "id": str(usuario_id),
+                "nombre": data.get("nombre_usuario", f"Usuario {usuario_id}")
+            }).execute()
+
+            # 2. Registrar la solicitud en la tabla transacciones
+            supabase_client.table("transacciones").insert({
+                "usuario_id": str(usuario_id),
+                "barajitas": int(barajitas_qty),
+                "monto": float(monto_bs),
+                "referencia": str(referencia),
+                "estado": "pendiente"
+            }).execute()
+
+            # 3. Registrar en la tabla compras
+            supabase_client.table("compras").insert({
+                "usuario_id": str(usuario_id),
+                "barajitas_qty": int(barajitas_qty),
+                "monto_bs": float(monto_bs),
+                "monto_usd": float(monto_usd) if monto_usd else 0.0,
+                "referencia": str(referencia)
+            }).execute()
+        except Exception as e:
+            print(f"Error insertando en Supabase: {e}")
+
+    # 4. Enviar la notificación a Telegram
     mensaje = (
         f"🛒 *NUEVA SOLICITUD DE COMPRA*\n\n"
         f"👤 *Usuario:* `{usuario_id}`\n"
         f"🎴 *Barajitas:* {barajitas_qty}\n"
-        f"💰 *Monto:* Bs. {float(monto_bs):.2f} (${float(monto_usd):.2f})\n"
+        f"💰 *Monto:* Bs. {float(monto_bs):.2f} (${float(monto_usd or 0):.2f})\n"
         f"🔢 *Referencia:* `{referencia}`"
     )
 
@@ -109,7 +163,7 @@ def notificar_compra():
 
 @app.route("/api/notificar-retiro", methods=["POST"])
 def notificar_retiro():
-    """Endpoint para notificar solicitudes de retiro parcial o liquidación total."""
+    """Endpoint para registrar y notificar solicitudes de retiro parcial o liquidación total."""
     data = request.get_json(silent=True) or {}
     
     usuario_id = data.get("usuario_id")
@@ -121,6 +175,20 @@ def notificar_retiro():
 
     if not all([usuario_id, monto_bs, monto_usd, datos_pago]):
         return jsonify({"status": "error", "message": "Faltan campos requeridos"}), 400
+
+    # Registrar retiro en Supabase
+    if supabase_client:
+        try:
+            tabla_destino = "retiros_premios" if tipo == "hito_parcial" else "retiros"
+            supabase_client.table(tabla_destino).insert({
+                "usuario_id": str(usuario_id),
+                "monto_bs": float(monto_bs),
+                "monto_usd": float(monto_usd),
+                "datos_pago": str(datos_pago),
+                "estado": "pendiente"
+            }).execute()
+        except Exception as e:
+            print(f"Error registrando retiro en Supabase: {e}")
 
     if tipo == "liquidacion_total":
         mensaje = (
