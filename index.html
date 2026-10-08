@@ -840,6 +840,10 @@
       if (STATE.isProcessingWithdrawal) {
         return alert('Tienes una solicitud de retiro en proceso. Espera la verificación.');
       }
+      
+      // Asegurar que specificMilestone sea numérico y no un evento de JS al llamarlo desde onclick="openWithdrawModal()"
+      const targetMilestone = typeof specificMilestone === 'number' ? specificMilestone : null;
+
       const container = document.getElementById('milestoneOptions');
       container.innerHTML = '';
 
@@ -871,7 +875,7 @@
 
         if (isUnlocked && !isClaimed) {
           btn.onclick = () => selectMilestoneToWithdraw(m, usdAmount);
-          if (!selectedOne || specificMilestone === m) selectedOne = { milestone: m, usd: usdAmount };
+          if (!selectedOne || targetMilestone === m) selectedOne = { milestone: m, usd: usdAmount };
         }
 
         container.appendChild(btn);
