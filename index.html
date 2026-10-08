@@ -676,13 +676,13 @@
           STATE.userBalanceBs = data.saldo_bs || 0;
           STATE.claimedMilestones = data.claimed_milestones || [];
         }
-        const { data: pendingData } = await STATE.supabase.from('retiros_premios').select('id').eq('usuario', STATE.userId).eq('estado', 'pendiente');
+        const { data: pendingData } = await STATE.supabase.from('retiros_premios').select('id').eq('usuario_id', STATE.userId).eq('estado', 'pendiente');
         if (pendingData && pendingData.length > 0) {
           hasPending = true;
         }
       } else {
         const localW = JSON.parse(localStorage.getItem('local_withdrawals') || '[]');
-        if (localW.some(w => w.usuario === STATE.userId && w.estado === 'pendiente')) {
+        if (localW.some(w => w.usuario_id === STATE.userId && w.estado === 'pendiente')) {
           hasPending = true;
         }
       }
@@ -783,7 +783,7 @@
       btn.innerText = 'PROCESANDO...';
       
       const purchaseData = {
-        usuario: STATE.userId,
+        usuario_id: STATE.userId,
         barajitas_qty: qty,
         monto_bs: totalBs,
         referencia: ref,
@@ -907,7 +907,7 @@
       const bsVal = (200 * STATE.bcvRate).toFixed(2);
 
       const withdrawalData = {
-        usuario: STATE.userId,
+        usuario_id: STATE.userId,
         tipo: 'hito_parcial',
         milestone: STATE.selectedMilestone,
         monto_bs: bsVal,
@@ -963,7 +963,7 @@
       updateUIHeader();
 
       const withdrawalData = {
-        usuario: STATE.userId,
+        usuario_id: STATE.userId,
         tipo: 'liquidacion_total',
         milestone: 0,
         monto_bs: STATE.userBalanceBs.toFixed(2),
@@ -1124,12 +1124,12 @@
         tr.className = "border-b border-slate-800 hover:bg-slate-900/50";
         tr.innerHTML = `
           <td class="p-3 text-xs">${new Date(tx.fecha).toLocaleString()}</td>
-          <td class="p-3 font-mono text-purple-300">${tx.usuario}</td>
+          <td class="p-3 font-mono text-purple-300">${tx.usuario_id}</td>
           <td class="p-3 font-bold">${tx.barajitas_qty}</td>
           <td class="p-3 text-emerald-400 font-bold">Bs. ${parseFloat(tx.monto_bs).toFixed(2)} ($${usdVal})</td>
           <td class="p-3 font-mono">${tx.referencia}</td>
           <td class="p-3 text-center space-x-2">
-            <button onclick="approvePayment('${tx.referencia}', '${tx.usuario}', ${tx.barajitas_qty}, ${tx.monto_bs})" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold">Aprobar</button>
+            <button onclick="approvePayment('${tx.referencia}', '${tx.usuario_id}', ${tx.barajitas_qty}, ${tx.monto_bs})" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold">Aprobar</button>
             <button onclick="rejectPayment('${tx.referencia}')" class="px-3 py-1 bg-red-600 hover:bg-red-500 text-white rounded-lg text-xs font-bold">Rechazar</button>
           </td>
         `;
@@ -1159,12 +1159,12 @@
         tr.className = "border-b border-slate-800 hover:bg-slate-900/50";
         tr.innerHTML = `
           <td class="p-3 text-xs">${new Date(w.fecha).toLocaleString()}</td>
-          <td class="p-3 font-mono text-purple-300">${w.usuario}</td>
+          <td class="p-3 font-mono text-purple-300">${w.usuario_id}</td>
           <td class="p-3 font-bold ${isTotal ? 'text-red-400' : 'text-amber-300'}">${isTotal ? 'LIQUIDACIÓN TOTAL' : `Hito #${w.milestone}`}</td>
           <td class="p-3 text-emerald-400 font-bold">$${w.monto_usd} USD (Bs. ${w.monto_bs})</td>
           <td class="p-3 text-xs font-mono">${w.datos_pago}</td>
           <td class="p-3 text-center space-x-2">
-            <button onclick="approveWithdrawal('${w.usuario}', ${w.milestone}, ${w.monto_bs}, '${w.tipo || 'hito_parcial'}')" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold">Aprobar</button>
+            <button onclick="approveWithdrawal('${w.usuario_id}', ${w.milestone}, ${w.monto_bs}, '${w.tipo || 'hito_parcial'}')" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold">Aprobar</button>
           </td>
         `;
         tbody.appendChild(tr);
@@ -1177,11 +1177,11 @@
 
       if (tipo === 'liquidacion_total') {
         if (STATE.supabase) {
-          await STATE.supabase.from('retiros_premios').update({ estado: 'aprobado', referencia_pago: refPago }).eq('usuario', userId).eq('tipo', 'liquidacion_total').eq('estado', 'pendiente');
+          await STATE.supabase.from('retiros_premios').update({ estado: 'aprobado', referencia_pago: refPago }).eq('usuario_id', userId).eq('tipo', 'liquidacion_total').eq('estado', 'pendiente');
           await STATE.supabase.from('usuarios').update({ cantidad_barajitas: 0, saldo_bs: 0, claimed_milestones: [] }).eq('id', userId);
         } else {
           const localW = JSON.parse(localStorage.getItem('local_withdrawals') || '[]');
-          const target = localW.find(w => w.usuario === userId && w.tipo === 'liquidacion_total' && w.estado === 'pendiente');
+          const target = localW.find(w => w.usuario_id === userId && w.tipo === 'liquidacion_total' && w.estado === 'pendiente');
           if (target) { target.estado = 'aprobado'; target.referencia_pago = refPago; }
           localStorage.setItem('local_withdrawals', JSON.stringify(localW));
           localStorage.setItem(`stickers_${userId}`, '0');
@@ -1190,7 +1190,7 @@
         }
       } else {
         if (STATE.supabase) {
-          await STATE.supabase.from('retiros_premios').update({ estado: 'aprobado', referencia_pago: refPago }).eq('usuario', userId).eq('milestone', milestone).eq('estado', 'pendiente');
+          await STATE.supabase.from('retiros_premios').update({ estado: 'aprobado', referencia_pago: refPago }).eq('usuario_id', userId).eq('milestone', milestone).eq('estado', 'pendiente');
           const { data: user } = await STATE.supabase.from('usuarios').select('*').eq('id', userId).single();
           const currentClaimed = user?.claimed_milestones || [];
           if (!currentClaimed.includes(milestone)) currentClaimed.push(milestone);
@@ -1198,7 +1198,7 @@
           await STATE.supabase.from('usuarios').update({ saldo_bs: newBalance, claimed_milestones: currentClaimed }).eq('id', userId);
         } else {
           const localW = JSON.parse(localStorage.getItem('local_withdrawals') || '[]');
-          const target = localW.find(w => w.usuario === userId && w.milestone === milestone && w.estado === 'pendiente');
+          const target = localW.find(w => w.usuario_id === userId && w.milestone === milestone && w.estado === 'pendiente');
           if (target) { target.estado = 'aprobado'; target.referencia_pago = refPago; }
           localStorage.setItem('local_withdrawals', JSON.stringify(localW));
 
@@ -1324,12 +1324,12 @@
 
       const usersMap = {};
       txs.forEach(t => {
-        if (!usersMap[t.usuario]) {
-          usersMap[t.usuario] = { id: t.usuario, stickers: 0, totalSpentBs: 0 };
+        if (!usersMap[t.usuario_id]) {
+          usersMap[t.usuario_id] = { id: t.usuario_id, stickers: 0, totalSpentBs: 0 };
         }
         if (t.estado === 'aprobado') {
-          usersMap[t.usuario].stickers += t.barajitas_qty;
-          usersMap[t.usuario].totalSpentBs += parseFloat(t.monto_bs);
+          usersMap[t.usuario_id].stickers += t.barajitas_qty;
+          usersMap[t.usuario_id].totalSpentBs += parseFloat(t.monto_bs);
         }
       });
 
@@ -1363,10 +1363,10 @@
       document.getElementById('modalUserTitle').innerText = `Expediente del Usuario: ${userId}`;
       let userTxs = [];
       if (STATE.supabase) {
-        const { data } = await STATE.supabase.from('transacciones').select('*').eq('usuario', userId);
+        const { data } = await STATE.supabase.from('transacciones').select('*').eq('usuario_id', userId);
         userTxs = data || [];
       } else {
-        userTxs = JSON.parse(localStorage.getItem('local_txs') || '[]').filter(t => t.usuario === userId);
+        userTxs = JSON.parse(localStorage.getItem('local_txs') || '[]').filter(t => t.usuario_id === userId);
       }
 
       let totalStickers = 0;
