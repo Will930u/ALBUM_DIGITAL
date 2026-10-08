@@ -84,7 +84,7 @@
     <!-- Contenedor con Indicador de Valor Neto y BOTÓN DE RETIRO POR HITO -->
     <div class="flex items-center space-x-3">
       <!-- Botón de Retiro Parcial por Hito -->
-      <button onclick="openWithdrawModal()" class="px-3.5 py-1.5 rounded-full bg-gradient-to-r from-amber-500 to-emerald-600 hover:from-amber-400 hover:to-emerald-500 text-white font-bold text-xs flex items-center space-x-1.5 shadow-lg border border-amber-300/40 transition transform active:scale-95">
+      <button id="btnHeaderMilestone" onclick="openWithdrawModal()" class="px-3.5 py-1.5 rounded-full bg-gradient-to-r from-amber-500 to-emerald-600 hover:from-amber-400 hover:to-emerald-500 text-white font-bold text-xs flex items-center space-x-1.5 shadow-lg border border-amber-300/40 transition transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">
         <i data-lucide="award" class="w-4 h-4"></i>
         <span>Premio Hito ($200)</span>
       </button>
@@ -96,7 +96,7 @@
         <span id="userBalanceBs" class="font-bold text-emerald-400 text-sm">Bs. 0.00 ($0.00)</span>
         
         <!-- Botón de Liquidación Total por Valor Neto -->
-        <button onclick="confirmTotalLiquidate()" title="Liquidar 100% del saldo y resetear álbum" class="ml-1 px-2 py-0.5 rounded-full bg-red-600/80 hover:bg-red-500 text-white font-extrabold text-[10px] uppercase border border-red-400/50 transition">
+        <button id="btnHeaderTotalLiquidate" onclick="confirmTotalLiquidate()" title="Liquidar 100% del saldo y resetear álbum" class="ml-1 px-2 py-0.5 rounded-full bg-red-600/80 hover:bg-red-500 text-white font-extrabold text-[10px] uppercase border border-red-400/50 transition disabled:opacity-50 disabled:cursor-not-allowed">
           Liquidar Todo
         </button>
       </div>
@@ -493,7 +493,7 @@
             <input type="text" id="wId" required placeholder="Cédula / RIF (Ej: V-21101658)" class="w-full bg-slate-900 border border-purple-500/40 rounded-lg p-2.5 text-xs text-white">
           </div>
 
-          <button type="submit" id="btnSendWithdraw" class="w-full py-3.5 bg-gradient-to-r from-amber-500 to-emerald-600 hover:from-amber-400 hover:to-emerald-500 text-white font-bold rounded-xl text-sm transition flex items-center justify-center space-x-2 shadow-lg">
+          <button type="submit" id="btnSendWithdraw" class="w-full py-3.5 bg-gradient-to-r from-amber-500 to-emerald-600 hover:from-amber-400 hover:to-emerald-500 text-white font-bold rounded-xl text-sm transition flex items-center justify-center space-x-2 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed">
             <i data-lucide="check-circle" class="w-4 h-4"></i>
             <span>CONFIRMAR Y SOLICITAR PREMIO ($200)</span>
           </button>
@@ -565,6 +565,7 @@
       userBalanceBs: 0,
       claimedMilestones: [], // Lista de hitos ya retirados [500, 1000, 1500, 2000]
       selectedMilestone: null,
+      isProcessingWithdrawal: false,
       logoClicks: 0,
       clickTimer: null,
       supabase: null,
@@ -662,6 +663,7 @@
       STATE.userBalanceBs = parseFloat(localStorage.getItem(`balance_${STATE.userId}`) || '0');
       STATE.claimedMilestones = JSON.parse(localStorage.getItem(`claimed_milestones_${STATE.userId}`) || '[]');
 
+      let hasPending = false;
       if (STATE.supabase) {
         const { data } = await STATE.supabase.from('usuarios').select('*').eq('id', STATE.userId).single();
         if (data) {
@@ -669,7 +671,18 @@
           STATE.userBalanceBs = data.saldo_bs || 0;
           STATE.claimedMilestones = data.claimed_milestones || [];
         }
+        const { data: pendingData } = await STATE.supabase.from('retiros_premios').select('id').eq('usuario_id', STATE.userId).eq('estado', 'pendiente');
+        if (pendingData && pendingData.length > 0) {
+          hasPending = true;
+        }
+      } else {
+        const localW = JSON.parse(localStorage.getItem('local_withdrawals') || '[]');
+        if (localW.some(w => w.usuario_id === STATE.userId && w.estado === 'pendiente')) {
+          hasPending = true;
+        }
       }
+
+      STATE.isProcessingWithdrawal = hasPending;
       updateUIHeader();
     }
 
@@ -679,6 +692,11 @@
       const progressPct = ((STATE.userStickersCount / STATE.totalStickers) * 100).toFixed(1);
       document.getElementById('albumProgressText').innerText = `${STATE.userStickersCount} / ${STATE.totalStickers} (${progressPct}%)`;
       document.getElementById('albumProgressBar').style.width = `${progressPct}%`;
+
+      const btnMilestone = document.getElementById('btnHeaderMilestone');
+      const btnLiquidate = document.getElementById('btnHeaderTotalLiquidate');
+      if (btnMilestone) btnMilestone.disabled = STATE.isProcessingWithdrawal;
+      if (btnLiquidate) btnLiquidate.disabled = STATE.isProcessingWithdrawal;
     }
 
     function renderAlbumPage() {
@@ -798,6 +816,9 @@
 
     // RETIRO POR HITO ($200 CADA 500 BARAJITAS)
     function openWithdrawModal(specificMilestone = null) {
+      if (STATE.isProcessingWithdrawal) {
+        return alert('Tienes una solicitud de retiro actualmente en proceso de verificación. Por favor espera a que sea procesada antes de solicitar otro retiro.');
+      }
       const container = document.getElementById('milestoneOptions');
       container.innerHTML = '';
 
@@ -860,7 +881,15 @@
 
     async function submitWithdrawalRequest(e) {
       e.preventDefault();
+      if (STATE.isProcessingWithdrawal) {
+        return alert('Ya existe una solicitud de retiro pendiente. Por favor espera su aprobación.');
+      }
       if (!STATE.selectedMilestone) return alert('Por favor selecciona un hito válido.');
+
+      const btnSubmit = document.getElementById('btnSendWithdraw');
+      btnSubmit.disabled = true;
+      STATE.isProcessingWithdrawal = true;
+      updateUIHeader();
 
       const bank = document.getElementById('wBank').value;
       const phone = document.getElementById('wPhone').value;
@@ -910,6 +939,9 @@
 
     // RETIRO TOTAL / LIQUIDACIÓN POR VALOR NETO
     async function confirmTotalLiquidate() {
+      if (STATE.isProcessingWithdrawal) {
+        return alert('Ya posees una solicitud de retiro o premio en proceso de revisión. Por favor espera a que sea completada.');
+      }
       if (STATE.userBalanceBs <= 0) {
         return alert('No posees saldo en el Valor Neto para liquidar.');
       }
@@ -928,6 +960,9 @@
       if (!bank || !phone || !id) {
         return alert("Debes ingresar todos los datos de Pago Móvil para continuar.");
       }
+
+      STATE.isProcessingWithdrawal = true;
+      updateUIHeader();
 
       const withdrawalData = {
         usuario_id: STATE.userId,
@@ -1504,38 +1539,45 @@
         userTxs = localTxs.filter(t => t.usuario_id === userId);
       }
 
-      const approved = userTxs.filter(t => t.estado === 'aprobado');
-      const totalStickers = approved.reduce((s, t) => s + t.barajitas_qty, 0);
-      const totalSpent = approved.reduce((s, t) => s + parseFloat(t.monto_bs), 0);
+      let totalStickers = 0;
+      let totalSpentBs = 0;
+      const historyTable = document.getElementById('modalUserHistoryTable');
+      historyTable.innerHTML = '';
+
       const rate = STATE.bcvRate || 1;
 
-      document.getElementById('modalUserStickers').innerText = totalStickers;
-      document.getElementById('modalUserSpent').innerText = `Bs. ${totalSpent.toFixed(2)} ($${(totalSpent/rate).toFixed(2)})`;
-
-      const tbody = document.getElementById('modalUserHistoryTable');
-      tbody.innerHTML = '';
       userTxs.forEach(t => {
+        if (t.estado === 'aprobado') {
+          totalStickers += t.barajitas_qty;
+          totalSpentBs += parseFloat(t.monto_bs);
+        }
+        const usdVal = (parseFloat(t.monto_bs) / rate).toFixed(2);
         const tr = document.createElement('tr');
         tr.className = "border-b border-slate-800";
         tr.innerHTML = `
           <td class="p-2">${new Date(t.fecha).toLocaleDateString()}</td>
           <td class="p-2 font-bold">${t.barajitas_qty}</td>
-          <td class="p-2 text-emerald-400">Bs. ${parseFloat(t.monto_bs).toFixed(2)}</td>
+          <td class="p-2 text-emerald-400 font-semibold">Bs. ${parseFloat(t.monto_bs).toFixed(2)} ($${usdVal})</td>
           <td class="p-2 font-mono">${t.referencia}</td>
-          <td class="p-2 uppercase text-[10px] font-bold ${t.estado === 'aprobado' ? 'text-emerald-400' : t.estado === 'pendiente' ? 'text-amber-400' : 'text-red-400'}">${t.estado}</td>
+          <td class="p-2 font-bold ${t.estado === 'aprobado' ? 'text-emerald-400' : t.estado === 'rechazado' ? 'text-red-400' : 'text-amber-400'}">${t.estado.toUpperCase()}</td>
         `;
-        tbody.appendChild(tr);
+        historyTable.appendChild(tr);
       });
+
+      document.getElementById('modalUserStickers').innerText = totalStickers;
+      document.getElementById('modalUserSpent').innerText = `Bs. ${totalSpentBs.toFixed(2)} ($${(totalSpentBs/rate).toFixed(2)})`;
+
+      document.getElementById('userModal').classList.remove('hidden');
 
       const ctx = document.getElementById('userIndividualChart').getContext('2d');
       if (window.userChart) window.userChart.destroy();
       window.userChart = new Chart(ctx, {
         type: 'line',
         data: {
-          labels: approved.map((_, i) => `Compra ${i+1}`),
+          labels: userTxs.map(t => new Date(t.fecha).toLocaleDateString()),
           datasets: [{
-            label: 'Barajitas Acumuladas',
-            data: approved.map((t, i) => approved.slice(0, i+1).reduce((sum, item) => sum + item.barajitas_qty, 0)),
+            label: 'Barajitas Adquiridas',
+            data: userTxs.map(t => t.barajitas_qty),
             borderColor: '#a855f7',
             backgroundColor: 'rgba(168, 85, 247, 0.2)',
             fill: true,
@@ -1545,18 +1587,27 @@
         options: {
           responsive: true,
           maintainAspectRatio: false,
-          plugins: { legend: { labels: { color: '#e2e8f0' } } }
+          plugins: { legend: { labels: { color: '#e2e8f0' } } },
+          scales: {
+            x: { ticks: { color: '#94a3b8' } },
+            y: { ticks: { color: '#94a3b8' } }
+          }
         }
       });
-
-      document.getElementById('userModal').classList.remove('hidden');
     }
 
     function closeUserModal() {
       document.getElementById('userModal').classList.add('hidden');
     }
 
-    // CONFIGURACIÓN Y PURGA DE DATOS
+    function purgeAllData() {
+      if (confirm("⚠️ ¡ADVERTENCIA DE PURGA TOTAL!\n\nEsto borrará todos los registros locales de compras, saldos, imágenes y retiros. ¿Estás seguro?")) {
+        localStorage.clear();
+        alert("Sistema reiniciado localmente.");
+        location.reload();
+      }
+    }
+
     function loadConfigForm() {
       document.getElementById('cfgSupabaseUrl').value = STATE.config.supabaseUrl;
       document.getElementById('cfgSupabaseKey').value = STATE.config.supabaseKey;
@@ -1569,13 +1620,13 @@
 
     function saveAdminConfig(e) {
       e.preventDefault();
-      STATE.config.supabaseUrl = document.getElementById('cfgSupabaseUrl').value.trim();
-      STATE.config.supabaseKey = document.getElementById('cfgSupabaseKey').value.trim();
-      STATE.config.telegramToken = document.getElementById('cfgTelegramToken').value.trim();
-      STATE.config.telegramChatId = document.getElementById('cfgTelegramChatId').value.trim();
-      STATE.config.bankId = document.getElementById('cfgBankId').value.trim();
-      STATE.config.bankPhone = document.getElementById('cfgBankPhone').value.trim();
-      STATE.config.bankCode = document.getElementById('cfgBankCode').value.trim();
+      STATE.config.supabaseUrl = document.getElementById('cfgSupabaseUrl').value;
+      STATE.config.supabaseKey = document.getElementById('cfgSupabaseKey').value;
+      STATE.config.telegramToken = document.getElementById('cfgTelegramToken').value;
+      STATE.config.telegramChatId = document.getElementById('cfgTelegramChatId').value;
+      STATE.config.bankId = document.getElementById('cfgBankId').value;
+      STATE.config.bankPhone = document.getElementById('cfgBankPhone').value;
+      STATE.config.bankCode = document.getElementById('cfgBankCode').value;
 
       localStorage.setItem('cfg_sb_url', STATE.config.supabaseUrl);
       localStorage.setItem('cfg_sb_key', STATE.config.supabaseKey);
@@ -1585,21 +1636,12 @@
       localStorage.setItem('cfg_bank_phone', STATE.config.bankPhone);
       localStorage.setItem('cfg_bank_code', STATE.config.bankCode);
 
-      document.getElementById('bankDisplay').innerText = `${STATE.config.bankCode}`;
+      document.getElementById('bankDisplay').innerText = `${STATE.config.bankCode} (Banco)`;
       document.getElementById('idDisplay').innerText = STATE.config.bankId;
       document.getElementById('phoneDisplay').innerText = STATE.config.bankPhone;
 
       initSupabase();
-      alert('Configuración guardada exitosamente.');
-    }
-
-    async function purgeAllData() {
-      const confirmPurge = confirm('⚠️ ¿ESTÁS SEGURO DE PURGAR TODO EL SISTEMA?\nSe eliminarán los registros locales y del usuario actual.');
-      if (!confirmPurge) return;
-
-      localStorage.clear();
-      alert('Sistema reiniciado localmente.');
-      location.reload();
+      alert('Configuración guardada correctamente.');
     }
   </script>
 </body>
