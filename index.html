@@ -68,7 +68,7 @@
     }
   </style>
   <!-- SDK Oficial de Telegram para Mini Apps -->
-<script src="https://telegram.org"></script>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body class="flex flex-col min-h-screen">
   <!-- CABECERA PRINCIPAL / NAVEGACIÓN -->
@@ -217,6 +217,7 @@
         </form>
       </div>
     </section>
+
     <!-- 4. PANEL DE ADMINISTRACIÓN (Acceso Oculto) -->
     <section id="adminSection" class="hidden w-full max-w-5xl space-y-6">
       <div class="metal-card p-6 md:p-8 space-y-6">
@@ -247,7 +248,7 @@
           </button>
           <button onclick="switchAdminTab('imagenesAdmin')" id="tabAdminImagenes" class="pb-3 font-semibold text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center space-x-2 whitespace-nowrap">
             <i data-lucide="image" class="w-4 h-4"></i>
-            <span>Gestión Masiva de Imágenes (Hasta 2000)</span>
+            <span>Gestión Masiva de Imágenes</span>
           </button>
           <button onclick="switchAdminTab('metricas')" id="tabAdminMetricas" class="pb-3 font-semibold text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center space-x-2 whitespace-nowrap">
             <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
@@ -303,7 +304,7 @@
           </div>
         </div>
 
-        <!-- TAB MODIFICADO: GESTIÓN Y SUBIDA MASIVA DE IMÁGENES (HASTA 2000) -->
+        <!-- TAB GESTIÓN Y SUBIDA MASIVA DE IMÁGENES -->
         <div id="adminContentImagenes" class="hidden space-y-6">
           <div class="bg-slate-950/60 p-5 rounded-xl border border-purple-500/30 space-y-4">
             <div class="border-b border-purple-500/20 pb-3">
@@ -331,7 +332,6 @@
               </div>
             </form>
 
-            <!-- Barra de Progreso Masivo -->
             <div id="uploadProgressContainer" class="hidden space-y-2 pt-2">
               <div class="flex justify-between text-xs font-bold">
                 <span id="uploadProgressLabel" class="text-purple-300">Procesando lote de imágenes...</span>
@@ -363,7 +363,6 @@
             </div>
           </div>
 
-          <!-- Modulo para Registrar Retiro/Gasto del Margen del 30% -->
           <div class="bg-purple-950/30 p-4 rounded-xl border border-purple-500/30 space-y-3">
             <h4 class="text-xs font-bold text-purple-200 uppercase tracking-wider flex items-center space-x-2">
               <i data-lucide="minus-circle" class="w-4 h-4 text-purple-400"></i>
@@ -466,7 +465,6 @@
           <button onclick="closeWithdrawModal()" class="text-slate-400 hover:text-white text-lg font-bold">✕</button>
         </div>
 
-        <!-- Selección del Hito Disponible (500, 1000, 1500, 2000) -->
         <div class="space-y-3">
           <label class="block text-xs font-semibold text-purple-200">Selecciona el Premio Hito a Retirar ($200 Fijo):</label>
           <div id="milestoneOptions" class="grid grid-cols-2 gap-2 text-xs"></div>
@@ -513,7 +511,6 @@
           <button onclick="closeUserModal()" class="text-slate-400 hover:text-white text-lg font-bold">✕</button>
         </div>
         
-        <!-- Métricas Rápidas del Usuario -->
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
           <div class="bg-slate-950/60 p-3 rounded-lg border border-purple-500/20">
             <span class="text-slate-400">Total Barajitas:</span>
@@ -525,12 +522,10 @@
           </div>
         </div>
 
-        <!-- Gráfica Exclusiva del Usuario -->
         <div class="bg-slate-950/60 p-3 rounded-xl border border-purple-500/20 h-48">
           <canvas id="userIndividualChart"></canvas>
         </div>
 
-        <!-- Historial de Transacciones del Usuario -->
         <div>
           <h4 class="text-xs font-bold text-purple-300 uppercase mb-2">Transacciones e Historial</h4>
           <div class="overflow-x-auto">
@@ -551,14 +546,16 @@
       </div>
     </div>
   </main>
+
   <script>
-    // 1. Inicializar la Mini App de Telegram
-const tg = window.Telegram.WebApp;
-tg.ready();
-tg.expand(); // Hace que la app se abra en pantalla completa
+    // Inicialización Segura Telegram Mini App
+    if (window.Telegram && window.Telegram.WebApp) {
+      const tg = window.Telegram.WebApp;
+      tg.ready();
+      tg.expand();
+    }
 
     // Configuración de conexión al Backend
-    const API_URL = "https://album-digital.onrender.com";
     const STATE = {
       currentPage: 1,
       totalPages: 80,
@@ -568,12 +565,13 @@ tg.expand(); // Hace que la app se abra en pantalla completa
       userId: getOrCreateUserId(),
       userStickersCount: 0,
       userBalanceBs: 0,
-      claimedMilestones: [], // Lista de hitos ya retirados [500, 1000, 1500, 2000]
+      claimedMilestones: [],
       selectedMilestone: null,
       isProcessingWithdrawal: false,
       logoClicks: 0,
       clickTimer: null,
       supabase: null,
+      userChartInstance: null,
       config: {
         supabaseUrl: localStorage.getItem('cfg_sb_url') || '',
         supabaseKey: localStorage.getItem('cfg_sb_key') || '',
@@ -603,9 +601,9 @@ tg.expand(); // Hace que la app se abra en pantalla completa
     }
 
     function initSupabase() {
-      if (STATE.config.supabaseUrl && STATE.config.supabaseKey) {
+      if (STATE.config.supabaseUrl && STATE.config.supabaseKey && window.supabase) {
         try {
-          STATE.supabase = supabase.createClient(STATE.config.supabaseUrl, STATE.config.supabaseKey);
+          STATE.supabase = window.supabase.createClient(STATE.config.supabaseUrl, STATE.config.supabaseKey);
         } catch (e) {
           console.error('Error al inicializar Supabase:', e);
         }
@@ -620,6 +618,7 @@ tg.expand(); // Hace que la app se abra en pantalla completa
         document.getElementById('bcvRateDisplay').innerText = `Bs. ${STATE.bcvRate.toFixed(2)}`;
         calculateTotal();
       } catch (e) {
+        STATE.bcvRate = 36.5; // Fallback promedio
         document.getElementById('bcvRateDisplay').innerText = 'Bs. --.--';
       }
     }
@@ -631,7 +630,7 @@ tg.expand(); // Hace que la app se abra en pantalla completa
         logo.addEventListener('click', () => {
           STATE.logoClicks++;
           clearTimeout(STATE.clickTimer);
-          if (STATE.logoClicks >= 20) {
+          if (STATE.logoClicks >= 10) {
             STATE.logoClicks = 0;
             openAdminPanel();
           } else {
@@ -653,6 +652,7 @@ tg.expand(); // Hace que la app se abra en pantalla completa
       document.getElementById('adminSection').classList.add('hidden');
       document.getElementById('navAlbum').className = "px-4 py-2 rounded-lg text-sm font-semibold transition bg-slate-800 text-slate-300 hover:bg-purple-600/30 flex items-center space-x-2";
       document.getElementById('navTienda').className = "px-4 py-2 rounded-lg text-sm font-semibold transition bg-slate-800 text-slate-300 hover:bg-purple-600/30 flex items-center space-x-2";
+      
       if (tab === 'album') {
         document.getElementById('albumSection').classList.remove('hidden');
         document.getElementById('navAlbum').className = "px-4 py-2 rounded-lg text-sm font-semibold transition bg-purple-600/30 text-purple-200 border border-purple-500/30 hover:bg-purple-600/50 flex items-center space-x-2";
@@ -731,12 +731,14 @@ tg.expand(); // Hace que la app se abra en pantalla completa
 
           slot.innerHTML = `
             <img src="${imgUrl}" alt="Barajita ${i}" class="w-full h-full object-cover rounded-lg" onerror="this.src='https://via.placeholder.com/150/1e1b4b/a855f7?text=${i}'">
-            <span class="absolute bottom-1 right-1 bg-black/80 px-1.5 py-0.5 rounded text-[10px] font-bold text-purple-300">#${i}</span>${isMilestone ? `<span class="absolute top-1 left-1 ${isClaimed ? 'bg-amber-600' : 'bg-emerald-600'} text-white text-[9px] font-extrabold px-1.5 py-0.5 rounded shadow">${isClaimed ? 'RETIRADO' : '¡PREMIO $200!'}</span>` : ''}
+            <span class="absolute bottom-1 right-1 bg-black/80 px-1.5 py-0.5 rounded text-[10px] font-bold text-purple-300">#${i}</span>
+            ${isMilestone ? `<span class="absolute top-1 left-1 ${isClaimed ? 'bg-amber-600' : 'bg-emerald-600'} text-white text-[9px] font-extrabold px-1.5 py-0.5 rounded shadow">${isClaimed ? 'RETIRADO' : '¡PREMIO $200!'}</span>` : ''}
           `;
         } else {
           slot.innerHTML = `
             <i data-lucide="${isMilestone ? 'award' : 'lock'}" class="w-6 h-6 ${isMilestone ? 'text-amber-400' : 'text-purple-500/40'} mb-1"></i>
-            <span class="text-xs font-bold ${isMilestone ? 'text-amber-300' : 'text-slate-500'}">#${i}</span>${isMilestone ? `<span class="text-[9px] text-amber-400/80 font-bold mt-1">Premio Hito $200</span>` : ''}
+            <span class="text-xs font-bold ${isMilestone ? 'text-amber-300' : 'text-slate-500'}">#${i}</span>
+            ${isMilestone ? `<span class="text-[9px] text-amber-400/80 font-bold mt-1">Premio Hito $200</span>` : ''}
           `;
         }
         grid.appendChild(slot);
@@ -779,6 +781,7 @@ tg.expand(); // Hace que la app se abra en pantalla completa
       const btn = document.getElementById('btnSubmitPurchase');
       btn.disabled = true;
       btn.innerText = 'PROCESANDO...';
+      
       const purchaseData = {
         usuario_id: STATE.userId,
         barajitas_qty: qty,
@@ -787,6 +790,7 @@ tg.expand(); // Hace que la app se abra en pantalla completa
         estado: 'pendiente',
         fecha: new Date().toISOString()
       };
+
       if (STATE.supabase) {
         await STATE.supabase.from('transacciones').insert([purchaseData]);
       } else {
@@ -794,6 +798,7 @@ tg.expand(); // Hace que la app se abra en pantalla completa
         localTxs.push(purchaseData);
         localStorage.setItem('local_txs', JSON.stringify(localTxs));
       }
+
       if (STATE.config.telegramToken && STATE.config.telegramChatId) {
         const usdVal = (totalBs / (STATE.bcvRate || 1)).toFixed(2);
         const msg = `🛒 *NUEVA SOLICITUD DE COMPRA*\n\n` +
@@ -812,6 +817,7 @@ tg.expand(); // Hace que la app se abra en pantalla completa
           console.error('Error Telegram:', e);
         }
       }
+
       alert('¡Pago reportado con éxito! Pendiente de verificación.');
       document.getElementById('refInput').value = '';
       btn.disabled = false;
@@ -819,10 +825,9 @@ tg.expand(); // Hace que la app se abra en pantalla completa
       switchTab('album');
     }
 
-    // RETIRO POR HITO ($200 CADA 500 BARAJITAS)
     function openWithdrawModal(specificMilestone = null) {
       if (STATE.isProcessingWithdrawal) {
-        return alert('Tienes una solicitud de retiro actualmente en proceso de verificación. Por favor espera a que sea procesada antes de solicitar otro retiro.');
+        return alert('Tienes una solicitud de retiro en proceso. Espera la verificación.');
       }
       const container = document.getElementById('milestoneOptions');
       container.innerHTML = '';
@@ -833,7 +838,7 @@ tg.expand(); // Hace que la app se abra en pantalla completa
       milestones.forEach(m => {
         const isUnlocked = STATE.userStickersCount >= m;
         const isClaimed = STATE.claimedMilestones.includes(m);
-        const usdAmount = "200.00"; // Premio fijo $200 por hito
+        const usdAmount = "200.00";
 
         const btn = document.createElement('button');
         btn.type = 'button';
@@ -846,7 +851,8 @@ tg.expand(); // Hace que la app se abra en pantalla completa
         }`;
 
         btn.innerHTML = `
-          <span class="font-bold text-amber-300">Hito Barajita #${m}</span> <span class="text-xs text-slate-300">$${usdAmount} USD (Fijo)</span>
+          <span class="font-bold text-amber-300">Hito Barajita #${m}</span> 
+          <span class="text-xs text-slate-300">$${usdAmount} USD (Fijo)</span>
           <span class="text-[10px] mt-1 font-bold ${isClaimed ? 'text-slate-400' : isUnlocked ? 'text-emerald-400' : 'text-slate-500'}">
             ${isClaimed ? '[ RETIRADO ]' : isUnlocked ? '¡DISPONIBLE!' : 'BLOQUEADO'}
           </span>
@@ -886,10 +892,8 @@ tg.expand(); // Hace que la app se abra en pantalla completa
 
     async function submitWithdrawalRequest(e) {
       e.preventDefault();
-      if (STATE.isProcessingWithdrawal) {
-        return alert('Ya existe una solicitud de retiro pendiente. Por favor espera su aprobación.');
-      }
-      if (!STATE.selectedMilestone) return alert('Por favor selecciona un hito válido.');
+      if (STATE.isProcessingWithdrawal) return alert('Ya existe una solicitud pendiente.');
+      if (!STATE.selectedMilestone) return alert('Selecciona un hito válido.');
 
       const btnSubmit = document.getElementById('btnSendWithdraw');
       btnSubmit.disabled = true;
@@ -908,7 +912,7 @@ tg.expand(); // Hace que la app se abra en pantalla completa
         milestone: STATE.selectedMilestone,
         monto_bs: bsVal,
         monto_usd: usdVal,
-        datos_pago: `${bank} | ${phone} \vert{}${id}`,
+        datos_pago: `${bank} | ${phone} | ${id}`,
         estado: 'pendiente',
         fecha: new Date().toISOString()
       };
@@ -926,7 +930,7 @@ tg.expand(); // Hace que la app se abra en pantalla completa
                     `👤 *Usuario:* \`${STATE.userId}\`\n` +
                     `🎯 *Hito:* Barajita #${STATE.selectedMilestone}\n` +
                     `💵 *Premio:* $${usdVal} USD (Bs.${bsVal})\n` +
-                    `📱 *Pago Móvil:* ${bank} / ${phone} /${id}`;
+                    `📱 *Pago Móvil:* ${bank} / ${phone} / ${id}`;
         try {
           await fetch(`https://api.telegram.org/bot${STATE.config.telegramToken}/sendMessage`, {
             method: 'POST',
@@ -938,33 +942,22 @@ tg.expand(); // Hace que la app se abra en pantalla completa
         }
       }
 
-      alert(`Solicitud de retiro del hito #${STATE.selectedMilestone} por $200 enviada con éxito.`);
+      alert(`Solicitud del hito #${STATE.selectedMilestone} por $200 enviada.`);
       closeWithdrawModal();
     }
 
-    // RETIRO TOTAL / LIQUIDACIÓN POR VALOR NETO
     async function confirmTotalLiquidate() {
-      if (STATE.isProcessingWithdrawal) {
-        return alert('Ya posees una solicitud de retiro o premio en proceso de revisión. Por favor espera a que sea completada.');
-      }
-      if (STATE.userBalanceBs <= 0) {
-        return alert('No posees saldo en el Valor Neto para liquidar.');
-      }
+      if (STATE.isProcessingWithdrawal) return alert('Tienes una solicitud en revisión.');
+      if (STATE.userBalanceBs <= 0) return alert('No posees saldo para liquidar.');
+
       const usdVal = STATE.bcvRate > 0 ? (STATE.userBalanceBs / STATE.bcvRate).toFixed(2) : '0.00';
-      const confirmAction = confirm(`⚠️ LIQUIDACIÓN TOTAL DEL ÁLBUM\n\n` +
-        `Retirarás el 100% de tu saldo: Bs. ${STATE.userBalanceBs.toFixed(2)} ($${usdVal} USD).\n` +
-        `Al procesar la salida, tu álbum se vaciará a 0 barajitas y tu saldo quedará en 0.\n\n` +
-        `¿Deseas solicitar la liquidación total?`);
+      if (!confirm(`⚠️ LIQUIDACIÓN TOTAL\n\nRetirarás Bs. ${STATE.userBalanceBs.toFixed(2)} ($${usdVal} USD).\nTu álbum volverá a 0.`)) return;
 
-      if (!confirmAction) return;
-
-      const bank = prompt("Ingresa tu Banco para Pago Móvil:");
-      const phone = prompt("Ingresa tu número de Teléfono:");
+      const bank = prompt("Ingresa tu Banco:");
+      const phone = prompt("Ingresa tu Teléfono:");
       const id = prompt("Ingresa tu Cédula/RIF:");
 
-      if (!bank || !phone || !id) {
-        return alert("Debes ingresar todos los datos de Pago Móvil para continuar.");
-      }
+      if (!bank || !phone || !id) return alert("Debes ingresar todos los datos.");
 
       STATE.isProcessingWithdrawal = true;
       updateUIHeader();
@@ -975,7 +968,7 @@ tg.expand(); // Hace que la app se abra en pantalla completa
         milestone: 0,
         monto_bs: STATE.userBalanceBs.toFixed(2),
         monto_usd: usdVal,
-        datos_pago: `${bank} | ${phone} \vert{}${id}`,
+        datos_pago: `${bank} | ${phone} | ${id}`,
         estado: 'pendiente',
         fecha: new Date().toISOString()
       };
@@ -988,27 +981,9 @@ tg.expand(); // Hace que la app se abra en pantalla completa
         localStorage.setItem('local_withdrawals', JSON.stringify(localW));
       }
 
-      if (STATE.config.telegramToken && STATE.config.telegramChatId) {
-        const msg = `🚨 *SOLICITUD DE LIQUIDACIÓN TOTAL (VALOR NETO)*\n\n` +
-                    `👤 *Usuario:* \`${STATE.userId}\`\n` +
-                    `💰 *Monto Total:* Bs. ${STATE.userBalanceBs.toFixed(2)} ($${usdVal} USD)\n` +
-                    `📱 *Pago Móvil:* ${bank} / ${phone} /${id}\n` +
-                    `⚠️ *Acción:* Vaciar álbum e ir a cero al aprobar.`;
-        try {
-          await fetch(`https://api.telegram.org/bot${STATE.config.telegramToken}/sendMessage`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ chat_id: STATE.config.telegramChatId, text: msg, parse_mode: 'Markdown' })
-          });
-        } catch (err) {
-          console.error('Error Telegram:', err);
-        }
-      }
-
-      alert('Solicitud de Liquidación Total enviada. Queda en revisión por administración.');
+      alert('Solicitud de Liquidación Total enviada a administración.');
     }
 
-    // ADMINISTRACIÓN
     function openAdminPanel() {
       document.getElementById('introSection').classList.add('hidden');
       document.getElementById('albumSection').classList.add('hidden');
@@ -1030,40 +1005,26 @@ tg.expand(); // Hace que la app se abra en pantalla completa
       document.getElementById('adminContentUsuarios').classList.add('hidden');
       document.getElementById('adminContentConfig').classList.add('hidden');
 
-      document.getElementById('tabAdminPagos').className = "pb-3 font-semibold text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center space-x-2 whitespace-nowrap";
-      document.getElementById('tabAdminretiros_premios').className = "pb-3 font-semibold text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center space-x-2 whitespace-nowrap";
-      document.getElementById('tabAdminImagenes').className = "pb-3 font-semibold text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center space-x-2 whitespace-nowrap";
-      document.getElementById('tabAdminMetricas').className = "pb-3 font-semibold text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center space-x-2 whitespace-nowrap";
-      document.getElementById('tabAdminUsuarios').className = "pb-3 font-semibold text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center space-x-2 whitespace-nowrap";
-      document.getElementById('tabAdminConfig').className = "pb-3 font-semibold text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center space-x-2 whitespace-nowrap";
-
       if (tab === 'pagos') {
         document.getElementById('adminContentPagos').classList.remove('hidden');
-        document.getElementById('tabAdminPagos').className = "pb-3 font-semibold text-sm border-b-2 border-purple-500 text-purple-300 flex items-center space-x-2 whitespace-nowrap";
         loadPendingPayments();
       } else if (tab === 'retiros_premiosAdmin') {
         document.getElementById('adminContentretiros_premios').classList.remove('hidden');
-        document.getElementById('tabAdminretiros_premios').className = "pb-3 font-semibold text-sm border-b-2 border-purple-500 text-purple-300 flex items-center space-x-2 whitespace-nowrap";
         loadPendingWithdrawals();
       } else if (tab === 'imagenesAdmin') {
         document.getElementById('adminContentImagenes').classList.remove('hidden');
-        document.getElementById('tabAdminImagenes').className = "pb-3 font-semibold text-sm border-b-2 border-purple-500 text-purple-300 flex items-center space-x-2 whitespace-nowrap";
       } else if (tab === 'metricas') {
         document.getElementById('adminContentMetricas').classList.remove('hidden');
-        document.getElementById('tabAdminMetricas').className = "pb-3 font-semibold text-sm border-b-2 border-purple-500 text-purple-300 flex items-center space-x-2 whitespace-nowrap";
         renderFinancialMetrics();
       } else if (tab === 'usuarios') {
         document.getElementById('adminContentUsuarios').classList.remove('hidden');
-        document.getElementById('tabAdminUsuarios').className = "pb-3 font-semibold text-sm border-b-2 border-purple-500 text-purple-300 flex items-center space-x-2 whitespace-nowrap";
         loadUserList();
       } else if (tab === 'config') {
         document.getElementById('adminContentConfig').classList.remove('hidden');
-        document.getElementById('tabAdminConfig').className = "pb-3 font-semibold text-sm border-b-2 border-purple-500 text-purple-300 flex items-center space-x-2 whitespace-nowrap";
         loadConfigForm();
       }
     }
 
-    // SUBIDA MASIVA DE IMÁGENES HACIA SUPABASE STORAGE (HASTA 2000 ARCHIVOS / ZIP)
     async function uploadStickerImagesBatch(e) {
       e.preventDefault();
       const fileInput = document.getElementById('imgFileAssetBatch');
@@ -1074,113 +1035,70 @@ tg.expand(); // Hace que la app se abra en pantalla completa
       const progressCounter = document.getElementById('uploadProgressCounter');
       const progressLabel = document.getElementById('uploadProgressLabel');
 
-      if (!STATE.supabase) {
-        alert('Supabase no está configurado. Por favor ingresa la URL y Anon Key en la pestaña Configuración.');
-        return;
-      }
-
-      if (!fileInput.files || fileInput.files.length === 0) {
-        alert('Selecciona archivos de imagen o un ZIP.');
-        return;
-      }
+      if (!STATE.supabase) return alert('Configura Supabase en la pestaña Configuración.');
+      if (!fileInput.files || fileInput.files.length === 0) return alert('Selecciona archivos.');
 
       btn.disabled = true;
-      btn.innerText = 'Preparando Carga Masiva...';
       statusMsg.classList.add('hidden');
       progressContainer.classList.remove('hidden');
-      progressBar.style.width = '0%';
 
-      let filesToUpload = []; // { name: '1.jpg', blob: File|Blob }
+      let filesToUpload = [];
 
       try {
         const firstFile = fileInput.files[0];
-        
-        // Si el usuario seleccionó un ZIP
         if (fileInput.files.length === 1 && (firstFile.type.includes('zip') || firstFile.name.endsWith('.zip'))) {
-          progressLabel.innerText = "Descomprimiendo archivo ZIP...";
+          progressLabel.innerText = "Descomprimiendo ZIP...";
           const zip = await JSZip.loadAsync(firstFile);
-          const entries = Object.keys(zip.files);
-
-          for (const filename of entries) {
+          for (const filename of Object.keys(zip.files)) {
             const entry = zip.files[filename];
             if (!entry.dir && /\.(jpg|jpeg|png|webp)$/i.test(filename)) {
-              const cleanName = filename.split('/').pop();
-              const numMatch = cleanName.match(/^(\d+)\./);
+              const numMatch = filename.split('/').pop().match(/^(\d+)\./);
               if (numMatch) {
-                const stickerNum = parseInt(numMatch[1]);
-                if (stickerNum >= 1 && stickerNum <= 2000) {
+                const num = parseInt(numMatch[1]);
+                if (num >= 1 && num <= 2000) {
                   const blob = await entry.async('blob');
-                  filesToUpload.push({ name: `${stickerNum}.jpg`, blob: blob });
+                  filesToUpload.push({ name: `${num}.jpg`, blob });
                 }
               }
             }
           }
         } else {
-          // Múltiples archivos seleccionados manualmente
           for (let i = 0; i < fileInput.files.length; i++) {
             const file = fileInput.files[i];
-            const cleanName = file.name;
-            const numMatch = cleanName.match(/^(\d+)\./);
+            const numMatch = file.name.match(/^(\d+)\./);
             if (numMatch) {
-              const stickerNum = parseInt(numMatch[1]);
-              if (stickerNum >= 1 && stickerNum <= 2000) {
-                filesToUpload.push({ name: `${stickerNum}.jpg`, blob: file });
-              }
+              const num = parseInt(numMatch[1]);
+              if (num >= 1 && num <= 2000) filesToUpload.push({ name: `${num}.jpg`, blob: file });
             }
           }
         }
 
-        if (filesToUpload.length === 0) {
-          throw new Error("No se encontraron imágenes válidas con formato numérico (ej: 1.jpg, 2.jpg) de 1 a 2000.");
-        }
-
-        progressLabel.innerText = "Subiendo imágenes a Supabase Storage...";
-        let completed = 0;
-        let errors = 0;
+        let completed = 0, errors = 0;
         const total = filesToUpload.length;
-
-        // Concurrencia de 5 solicitudes simultáneas para máximo rendimiento
-        const concurrency = 5;
         const queue = [...filesToUpload];
 
         const worker = async () => {
           while (queue.length > 0) {
             const item = queue.shift();
             try {
-              const { error } = await STATE.supabase.storage
-                .from('barajitas')
-                .upload(item.name, item.blob, {
-                  cacheControl: '3600',
-                  upsert: true
-                });
-
+              const { error } = await STATE.supabase.storage.from('barajitas').upload(item.name, item.blob, { upsert: true });
               if (error) errors++;
-            } catch (err) {
-              errors++;
-            } finally {
-              completed++;
-              const pct = Math.round((completed / total) * 100);
-              progressBar.style.width = `${pct}%`;
-              progressCounter.innerText = `${completed} / ${total} (${pct}%)`;
-            }
+            } catch { errors++; }
+            completed++;
+            const pct = Math.round((completed / total) * 100);
+            progressBar.style.width = `${pct}%`;
+            progressCounter.innerText = `${completed} / ${total} (${pct}%)`;
           }
         };
 
-        const workers = Array.from({ length: Math.min(concurrency, queue.length) }, () => worker());
-        await Promise.all(workers);
-
+        await Promise.all(Array.from({ length: Math.min(5, queue.length) }, worker));
         statusMsg.className = "p-3 rounded-lg text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 block";
-        statusMsg.innerText = `✔️ Carga Masiva Finalizada: ${completed - errors} imágenes subidas con éxito.${errors > 0 ? ` (${errors} fallaron)` : ''}`;
-        fileInput.value = '';
-
+        statusMsg.innerText = `✔️ Carga Finalizada: ${completed - errors} de ${total} subidas.`;
       } catch (err) {
-        console.error('Error en carga masiva:', err);
         statusMsg.className = "p-3 rounded-lg text-xs font-bold bg-red-500/20 text-red-300 border border-red-500/40 block";
-        statusMsg.innerText = `❌ Error en Carga Masiva: ${err.message || 'Error inesperado procesando las imágenes.'}`;
+        statusMsg.innerText = `❌ Error: ${err.message}`;
       } finally {
         btn.disabled = false;
-        btn.innerHTML = `<i data-lucide="upload" class="w-4 h-4"></i><span>Iniciar Carga Masiva a Supabase Storage</span>`;
-        lucide.createIcons();
       }
     }
 
@@ -1192,13 +1110,14 @@ tg.expand(); // Hace que la app se abra en pantalla completa
         const { data } = await STATE.supabase.from('transacciones').select('*').eq('estado', 'pendiente');
         pending = data || [];
       } else {
-        const localTxs = JSON.parse(localStorage.getItem('local_txs') || '[]');
-        pending = localTxs.filter(t => t.estado === 'pendiente');
+        pending = JSON.parse(localStorage.getItem('local_txs') || '[]').filter(t => t.estado === 'pendiente');
       }
+
       if (pending.length === 0) {
         tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-500">No hay pagos pendientes.</td></tr>`;
         return;
       }
+
       pending.forEach(tx => {
         const usdVal = STATE.bcvRate > 0 ? (parseFloat(tx.monto_bs) / STATE.bcvRate).toFixed(2) : '0.00';
         const tr = document.createElement('tr');
@@ -1207,11 +1126,11 @@ tg.expand(); // Hace que la app se abra en pantalla completa
           <td class="p-3 text-xs">${new Date(tx.fecha).toLocaleString()}</td>
           <td class="p-3 font-mono text-purple-300">${tx.usuario_id}</td>
           <td class="p-3 font-bold">${tx.barajitas_qty}</td>
-          <td class="p-3 text-emerald-400 font-bold">Bs. ${parseFloat(tx.monto_bs).toFixed(2)} <span class="text-xs text-slate-400">($${usdVal})</span></td>
+          <td class="p-3 text-emerald-400 font-bold">Bs. ${parseFloat(tx.monto_bs).toFixed(2)} ($${usdVal})</td>
           <td class="p-3 font-mono">${tx.referencia}</td>
           <td class="p-3 text-center space-x-2">
-            <button onclick="approvePayment('${tx.referencia}', '${tx.usuario_id}', ${tx.barajitas_qty},${tx.monto_bs})" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition">Aprobar</button>
-            <button onclick="rejectPayment('${tx.referencia}')" class="px-3 py-1 bg-red-600 hover:bg-red-500 text-white rounded-lg text-xs font-bold transition">Rechazar</button>
+            <button onclick="approvePayment('${tx.referencia}', '${tx.usuario_id}', ${tx.barajitas_qty}, ${tx.monto_bs})" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold">Aprobar</button>
+            <button onclick="rejectPayment('${tx.referencia}')" class="px-3 py-1 bg-red-600 hover:bg-red-500 text-white rounded-lg text-xs font-bold">Rechazar</button>
           </td>
         `;
         tbody.appendChild(tr);
@@ -1226,12 +1145,11 @@ tg.expand(); // Hace que la app se abra en pantalla completa
         const { data } = await STATE.supabase.from('retiros_premios').select('*').eq('estado', 'pendiente');
         pending = data || [];
       } else {
-        const localW = JSON.parse(localStorage.getItem('local_withdrawals') || '[]');
-        pending = localW.filter(w => w.estado === 'pendiente');
+        pending = JSON.parse(localStorage.getItem('local_withdrawals') || '[]').filter(w => w.estado === 'pendiente');
       }
 
       if (pending.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-500">No hay solicitudes de retiro pendientes.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-500">No hay retiros pendientes.</td></tr>`;
         return;
       }
 
@@ -1242,13 +1160,11 @@ tg.expand(); // Hace que la app se abra en pantalla completa
         tr.innerHTML = `
           <td class="p-3 text-xs">${new Date(w.fecha).toLocaleString()}</td>
           <td class="p-3 font-mono text-purple-300">${w.usuario_id}</td>
-          <td class="p-3 font-bold ${isTotal ? 'text-red-400' : 'text-amber-300'}">
-            ${isTotal ? 'LIQUIDACIÓN TOTAL' : `Hito #${w.milestone}`}
-          </td>
-          <td class="p-3 text-emerald-400 font-bold">$${w.monto_usd} USD <span class="text-xs text-slate-400">(Bs. ${w.monto_bs})</span></td>
+          <td class="p-3 font-bold ${isTotal ? 'text-red-400' : 'text-amber-300'}">${isTotal ? 'LIQUIDACIÓN TOTAL' : `Hito #${w.milestone}`}</td>
+          <td class="p-3 text-emerald-400 font-bold">$${w.monto_usd} USD (Bs. ${w.monto_bs})</td>
           <td class="p-3 text-xs font-mono">${w.datos_pago}</td>
           <td class="p-3 text-center space-x-2">
-            <button onclick="approveWithdrawal('${w.usuario_id}',${w.milestone}, ${w.monto_bs}, '${w.tipo || 'hito_parcial'}')" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition">Aprobar Retiro</button>
+            <button onclick="approveWithdrawal('${w.usuario_id}', ${w.milestone}, ${w.monto_bs}, '${w.tipo || 'hito_parcial'}')" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold">Aprobar</button>
           </td>
         `;
         tbody.appendChild(tr);
@@ -1256,10 +1172,8 @@ tg.expand(); // Hace que la app se abra en pantalla completa
     }
 
     async function approveWithdrawal(userId, milestone, montoBs, tipo) {
-      const refPago = prompt("Ingresa el número de referencia del Pago Móvil realizado para completar la aprobación:");
-      if (!refPago || refPago.trim() === "") {
-        return alert("Aprobación cancelada. Se requiere el número de referencia.");
-      }
+      const refPago = prompt("Número de referencia de Pago Móvil realizado:");
+      if (!refPago) return alert("Operación cancelada.");
 
       if (tipo === 'liquidacion_total') {
         if (STATE.supabase) {
@@ -1268,101 +1182,35 @@ tg.expand(); // Hace que la app se abra en pantalla completa
         } else {
           const localW = JSON.parse(localStorage.getItem('local_withdrawals') || '[]');
           const target = localW.find(w => w.usuario_id === userId && w.tipo === 'liquidacion_total' && w.estado === 'pendiente');
-          if (target) {
-            target.estado = 'aprobado';
-            target.referencia_pago = refPago;
-          }
+          if (target) { target.estado = 'aprobado'; target.referencia_pago = refPago; }
           localStorage.setItem('local_withdrawals', JSON.stringify(localW));
-
           localStorage.setItem(`stickers_${userId}`, '0');
           localStorage.setItem(`balance_${userId}`, '0');
           localStorage.setItem(`claimed_milestones_${userId}`, JSON.stringify([]));
         }
-
-        const msgAprobacion = `✅ SOLICITUD DE LIQUIDACIÓN TOTAL (VALOR NETO)\n\n` +
-                              `Esa solicitud fue pagada con éxito.\n` +
-                              `Número de referencia: ${refPago}`;
-
-        if (STATE.config.telegramToken && STATE.config.telegramChatId) {
-          fetch(`https://api.telegram.org/bot${STATE.config.telegramToken}/sendMessage`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              chat_id: STATE.config.telegramChatId,
-              text: `🚨 *SOLICITUD DE LIQUIDACIÓN TOTAL PAGADA*\n\n` +
-                    `👤 *Usuario:* \`${userId}\`\n` +
-                    `✅ *Estado:* Pagada con éxito\n` +
-                    `📑 *Número de Referencia:* \`${refPago}\``,
-              parse_mode: 'Markdown'
-            })
-          });
-        }
-
-        alert(`${msgAprobacion}\n\nÁlbum del usuario vaciado a 0.`);
       } else {
         if (STATE.supabase) {
           await STATE.supabase.from('retiros_premios').update({ estado: 'aprobado', referencia_pago: refPago }).eq('usuario_id', userId).eq('milestone', milestone).eq('estado', 'pendiente');
           const { data: user } = await STATE.supabase.from('usuarios').select('*').eq('id', userId).single();
-          const currentClaimed = user && user.claimed_milestones ? user.claimed_milestones : [];
+          const currentClaimed = user?.claimed_milestones || [];
           if (!currentClaimed.includes(milestone)) currentClaimed.push(milestone);
-
-          const newBalance = Math.max(0, (user.saldo_bs || 0) - parseFloat(montoBs));
-          let newStickers = user.cantidad_barajitas || 0;
-
-          if (milestone === 2000) {
-            newStickers = 0;
-            currentClaimed.length = 0;
-          }
-
-          await STATE.supabase.from('usuarios').update({
-            saldo_bs: newBalance,
-            cantidad_barajitas: newStickers,
-            claimed_milestones: currentClaimed
-          }).eq('id', userId);
+          const newBalance = Math.max(0, (user?.saldo_bs || 0) - parseFloat(montoBs));
+          await STATE.supabase.from('usuarios').update({ saldo_bs: newBalance, claimed_milestones: currentClaimed }).eq('id', userId);
         } else {
           const localW = JSON.parse(localStorage.getItem('local_withdrawals') || '[]');
           const target = localW.find(w => w.usuario_id === userId && w.milestone === milestone && w.estado === 'pendiente');
-          if (target) {
-            target.estado = 'aprobado';
-            target.referencia_pago = refPago;
-          }
+          if (target) { target.estado = 'aprobado'; target.referencia_pago = refPago; }
           localStorage.setItem('local_withdrawals', JSON.stringify(localW));
 
           const currentClaimed = JSON.parse(localStorage.getItem(`claimed_milestones_${userId}`) || '[]');
           if (!currentClaimed.includes(milestone)) currentClaimed.push(milestone);
-
           const currentBal = parseFloat(localStorage.getItem(`balance_${userId}`) || '0');
-          const newBalance = Math.max(0, currentBal - parseFloat(montoBs));
-          let currentStickers = parseInt(localStorage.getItem(`stickers_${userId}`) || '0');
-
-          if (milestone === 2000) {
-            currentStickers = 0;
-            currentClaimed.length = 0;
-          }
-
-          localStorage.setItem(`balance_${userId}`, newBalance.toString());
-          localStorage.setItem(`stickers_${userId}`, currentStickers.toString());
+          localStorage.setItem(`balance_${userId}`, Math.max(0, currentBal - parseFloat(montoBs)).toString());
           localStorage.setItem(`claimed_milestones_${userId}`, JSON.stringify(currentClaimed));
         }
-
-        if (STATE.config.telegramToken && STATE.config.telegramChatId) {
-          fetch(`https://api.telegram.org/bot${STATE.config.telegramToken}/sendMessage`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              chat_id: STATE.config.telegramChatId,
-              text: `🏆 *SOLICITUD DE PREMIO HITO #${milestone} PAGADA*\n\n` +
-                    `👤 *Usuario:* \`${userId}\`\n` +
-                    `✅ *Estado:* Pagada con éxito\n` +
-                    `📑 *Número de Referencia:* \`${refPago}\``,
-              parse_mode: 'Markdown'
-            })
-          });
-        }
-
-        alert(`Solicitud del Hito #${milestone} fue pagada con éxito.\nNúmero de referencia: ${refPago}`);
       }
 
+      alert("Retiro Aprobado y Procesado.");
       loadUserData();
       loadPendingWithdrawals();
     }
@@ -1372,12 +1220,10 @@ tg.expand(); // Hace que la app se abra en pantalla completa
       if (STATE.supabase) {
         await STATE.supabase.from('transacciones').update({ estado: 'aprobado' }).eq('referencia', ref);
         const { data: user } = await STATE.supabase.from('usuarios').select('*').eq('id', userId).single();
-        const currentQty = user ? user.cantidad_barajitas : 0;
-        const currentBalance = user ? user.saldo_bs : 0;
         await STATE.supabase.from('usuarios').upsert({
           id: userId,
-          cantidad_barajitas: currentQty + qty,
-          saldo_bs: currentBalance + userNetShareBs
+          cantidad_barajitas: (user?.cantidad_barajitas || 0) + qty,
+          saldo_bs: (user?.saldo_bs || 0) + userNetShareBs
         });
       } else {
         const localTxs = JSON.parse(localStorage.getItem('local_txs') || '[]');
@@ -1388,17 +1234,6 @@ tg.expand(); // Hace que la app se abra en pantalla completa
         const currentBalance = parseFloat(localStorage.getItem(`balance_${userId}`) || '0');
         localStorage.setItem(`stickers_${userId}`, currentQty + qty);
         localStorage.setItem(`balance_${userId}`, currentBalance + userNetShareBs);
-      }
-      if (STATE.config.telegramToken && STATE.config.telegramChatId) {
-        fetch(`https://api.telegram.org/bot${STATE.config.telegramToken}/sendMessage`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            chat_id: STATE.config.telegramChatId,
-            text: `✅ *COMPRA APROBADA*\n\nUsuario: \`${userId}\`\nBarajitas: ${qty}\nReferencia: \`${ref}\``,
-            parse_mode: 'Markdown'
-          })
-        });
       }
       alert(`Pago ${ref} aprobado.`);
       loadUserData();
@@ -1417,15 +1252,13 @@ tg.expand(); // Hace que la app se abra en pantalla completa
       loadPendingPayments();
     }
 
-    // MÉTRICAS Y CAJA DINÁMICA DE LA PLATAFORMA
     async function renderFinancialMetrics() {
       let approvedTxs = [];
       if (STATE.supabase) {
         const { data } = await STATE.supabase.from('transacciones').select('*').eq('estado', 'aprobado');
         approvedTxs = data || [];
       } else {
-        const localTxs = JSON.parse(localStorage.getItem('local_txs') || '[]');
-        approvedTxs = localTxs.filter(t => t.estado === 'aprobado');
+        approvedTxs = JSON.parse(localStorage.getItem('local_txs') || '[]').filter(t => t.estado === 'aprobado');
       }
 
       const totalSales = approvedTxs.reduce((sum, t) => sum + parseFloat(t.monto_bs), 0);
@@ -1446,7 +1279,7 @@ tg.expand(); // Hace que la app se abra en pantalla completa
       window.myChart = new Chart(ctx, {
         type: 'doughnut',
         data: {
-          labels: ['Caja Neto Plataforma (30% - retiros_premios)', 'Valor Neto Usuarios (70%)'],
+          labels: ['Caja Neto Plataforma (30%)', 'Valor Neto Usuarios (70%)'],
           datasets: [{
             data: [Math.max(0, currentPlatformProfit), userNetValue],
             backgroundColor: ['#a855f7', '#10b981'],
@@ -1474,11 +1307,10 @@ tg.expand(); // Hace que la app se abra en pantalla completa
 
       document.getElementById('withdrawalAmountBs').value = '';
       document.getElementById('withdrawalConcept').value = '';
-      alert('Retiro registrado correctamente.');
+      alert('Egreso registrado.');
       renderFinancialMetrics();
     }
 
-    // EXPEDIENTES DE USUARIOS Y BUSCADOR
     async function loadUserList() {
       const tbody = document.getElementById('userListTable');
       tbody.innerHTML = '';
@@ -1512,7 +1344,7 @@ tg.expand(); // Hace que la app se abra en pantalla completa
           <td class="p-3 text-emerald-400 font-bold">Bs. ${u.totalSpentBs.toFixed(2)} <span class="text-xs text-slate-400">($${(u.totalSpentBs/rate).toFixed(2)})</span></td>
           <td class="p-3 text-blue-400 font-bold">Bs. ${net70Bs.toFixed(2)} <span class="text-xs text-slate-400">($${(net70Bs/rate).toFixed(2)})</span></td>
           <td class="p-3 text-center">
-            <button onclick="openUserModal('${u.id}')" class="px-3 py-1 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-bold transition">Ver Expediente</button>
+            <button onclick="openUserModal('${u.id}')" class="px-3 py-1 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-bold">Ver Expediente</button>
           </td>
         `;
         tbody.appendChild(tr);
@@ -1523,8 +1355,7 @@ tg.expand(); // Hace que la app se abra en pantalla completa
       const filter = document.getElementById('userSearchInput').value.toLowerCase();
       const rows = document.querySelectorAll('#userListTable tr');
       rows.forEach(row => {
-        const text = row.innerText.toLowerCase();
-        row.style.display = text.includes(filter) ? '' : 'none';
+        row.style.display = row.innerText.toLowerCase().includes(filter) ? '' : 'none';
       });
     }
 
@@ -1535,15 +1366,13 @@ tg.expand(); // Hace que la app se abra en pantalla completa
         const { data } = await STATE.supabase.from('transacciones').select('*').eq('usuario_id', userId);
         userTxs = data || [];
       } else {
-        const localTxs = JSON.parse(localStorage.getItem('local_txs') || '[]');
-        userTxs = localTxs.filter(t => t.usuario_id === userId);
+        userTxs = JSON.parse(localStorage.getItem('local_txs') || '[]').filter(t => t.usuario_id === userId);
       }
 
       let totalStickers = 0;
       let totalSpentBs = 0;
       const historyTable = document.getElementById('modalUserHistoryTable');
       historyTable.innerHTML = '';
-
       const rate = STATE.bcvRate || 1;
 
       userTxs.forEach(t => {
@@ -1557,34 +1386,31 @@ tg.expand(); // Hace que la app se abra en pantalla completa
         tr.innerHTML = `
           <td class="p-2">${new Date(t.fecha).toLocaleDateString()}</td>
           <td class="p-2 font-bold">${t.barajitas_qty}</td>
-          <td class="p-2 text-emerald-400 font-bold">Bs. ${parseFloat(t.monto_bs).toFixed(2)} ($${usdVal})</td>
-          <td class="p-2 font-mono text-xs">${t.referencia}</td>
-          <td class="p-2"><span class="px-2 py-0.5 rounded text-[10px] font-bold ${t.estado === 'aprobado' ? 'bg-emerald-500/20 text-emerald-300' : t.estado === 'rechazado' ? 'bg-red-500/20 text-red-300' : 'bg-amber-500/20 text-amber-300'}">${t.estado.toUpperCase()}</span></td>
+          <td class="p-2 text-emerald-400">Bs. ${parseFloat(t.monto_bs).toFixed(2)} ($${usdVal})</td>
+          <td class="p-2 font-mono">${t.referencia}</td>
+          <td class="p-2"><span class="px-2 py-0.5 rounded text-[10px] uppercase font-bold ${t.estado === 'aprobado' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'}">${t.estado}</span></td>
         `;
         historyTable.appendChild(tr);
       });
 
-      document.getElementById('modalUserStickers').innerText = `${totalStickers} / 2000`;
+      document.getElementById('modalUserStickers').innerText = totalStickers;
       document.getElementById('modalUserSpent').innerText = `Bs. ${totalSpentBs.toFixed(2)} ($${(totalSpentBs/rate).toFixed(2)})`;
 
       const ctx = document.getElementById('userIndividualChart').getContext('2d');
-      if (window.userChart) window.userChart.destroy();
-      window.userChart = new Chart(ctx, {
-        type: 'bar',
+      if (STATE.userChartInstance) STATE.userChartInstance.destroy();
+      STATE.userChartInstance = new Chart(ctx, {
+        type: 'line',
         data: {
-          labels: userTxs.map((_, idx) => `Compra ${idx + 1}`),
+          labels: userTxs.map((_, idx) => `Tx #${idx + 1}`),
           datasets: [{
-            label: 'Barajitas Obt.',
-            data: userTxs.map(t => t.estado === 'aprobado' ? t.barajitas_qty : 0),
-            backgroundColor: '#a855f7'
+            label: 'Barajitas Adquiridas',
+            data: userTxs.map(t => t.barajitas_qty),
+            borderColor: '#a855f7',
+            backgroundColor: 'rgba(168, 85, 247, 0.2)',
+            fill: true
           }]
         },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          scales: { y: { beginAtZero: true } },
-          plugins: { legend: { display: false } }
-        }
+        options: { responsive: true, maintainAspectRatio: false }
       });
 
       document.getElementById('userModal').classList.remove('hidden');
@@ -1599,153 +1425,29 @@ tg.expand(); // Hace que la app se abra en pantalla completa
       document.getElementById('cfgSupabaseKey').value = STATE.config.supabaseKey;
       document.getElementById('cfgTelegramToken').value = STATE.config.telegramToken;
       document.getElementById('cfgTelegramChatId').value = STATE.config.telegramChatId;
-      document.getElementById('cfgBankId').value = STATE.config.bankId;
-      document.getElementById('cfgBankPhone').value = STATE.config.bankPhone;
-      document.getElementById('cfgBankCode').value = STATE.config.bankCode;
     }
 
     function saveAdminConfig(e) {
       e.preventDefault();
-      STATE.config.supabaseUrl = document.getElementById('cfgSupabaseUrl').value;
-      STATE.config.supabaseKey = document.getElementById('cfgSupabaseKey').value;
-      STATE.config.telegramToken = document.getElementById('cfgTelegramToken').value;
-      STATE.config.telegramChatId = document.getElementById('cfgTelegramChatId').value;
-      STATE.config.bankId = document.getElementById('cfgBankId').value;
-      STATE.config.bankPhone = document.getElementById('cfgBankPhone').value;
-      STATE.config.bankCode = document.getElementById('cfgBankCode').value;
+      STATE.config.supabaseUrl = document.getElementById('cfgSupabaseUrl').value.trim();
+      STATE.config.supabaseKey = document.getElementById('cfgSupabaseKey').value.trim();
+      STATE.config.telegramToken = document.getElementById('cfgTelegramToken').value.trim();
+      STATE.config.telegramChatId = document.getElementById('cfgTelegramChatId').value.trim();
 
       localStorage.setItem('cfg_sb_url', STATE.config.supabaseUrl);
       localStorage.setItem('cfg_sb_key', STATE.config.supabaseKey);
       localStorage.setItem('cfg_tg_token', STATE.config.telegramToken);
       localStorage.setItem('cfg_tg_chat', STATE.config.telegramChatId);
-      localStorage.setItem('cfg_bank_id', STATE.config.bankId);
-      localStorage.setItem('cfg_bank_phone', STATE.config.bankPhone);
-      localStorage.setItem('cfg_bank_code', STATE.config.bankCode);
 
       initSupabase();
       alert('Configuración guardada exitosamente.');
     }
-    // ==========================================
-// REGISTRO AUTOMÁTICO DE TELEGRAM MINI APP
-// ==========================================
-// Validación segura para evitar que se rompa la aplicación
-    tg = null;
-if (typeof window !== 'undefined' && window.Telegram && window.Telegram.WebApp) {
-    tg = window.Telegram.WebApp;
-    tg.ready();
-    tg.expand();
-}
 
-let usuarioTelegramId = null;
-let usuarioTelegramNombre = "";
-
-// Función que se ejecuta automáticamente al cargar la página
-async function verificarUsuarioTelegram() {
-    if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
-        const user = tg.initDataUnsafe.user;
-        usuarioTelegramId = user.id;
-        usuarioTelegramNombre = user.first_name;
-        const usuarioTelegramUsername = user.username || 'sin_username';
-
-        console.log(`Usuario Telegram: ${usuarioTelegramNombre} (${usuarioTelegramId})`);
-
-        // Esperar un momento breve para asegurar que initSupabase() haya terminado
-        setTimeout(async () => {
-            if (!STATE.supabase) {
-                console.error("Supabase no se ha inicializado todavía.");
-                return;
-            }
-            await autoRegistroSupabase(usuarioTelegramId, usuarioTelegramNombre, usuarioTelegramUsername);
-        }, 1000);
-
-    } else {
-        console.log("Modo de pruebas: No se detectó Telegram.");
-        // ID de pruebas para cuando uses el navegador de la PC
-        usuarioTelegramId = 123456789;
-        usuarioTelegramNombre = "Usuario Prueba";
-    }
-}
-
-async function autoRegistroSupabase(id, nombre, username) {
-    try {
-        // Convertimos el ID numérico de Telegram a texto para tu columna 'id'
-        const idTexto = String(id);
-
-        // 1. Buscamos si el usuario ya existe usando tu columna 'id'
-        let { data: usuarioExistente, error: errorBusqueda } = await STATE.supabase
-            .from('usuarios')
-            .select('*')
-            .eq('id', idTexto)
-            .maybeSingle(); 
-
-        if (!usuarioExistente) {
-            console.log("Usuario nuevo. Registrando en Supabase con sus columnas reales...");
-            
-            // 2. Si no existe, lo insertamos usando los nombres exactos de tus columnas
-            let { data: nuevoUsuario, error: errorInsercion } = await STATE.supabase
-                .from('usuarios')
-                .insert([
-                    { 
-                        id: idTexto,       // Tu columna 'id' (text) recibe el ID de Telegram
-                        nombre: nombre,   // Tu columna 'nombre' (text)
-                        saldo_usd: 0.00   // Tu columna 'saldo_usd' (numeric) inicia en cero
-                    }
-                ])
-                .select()
-                .single();
-
-            if (errorInsercion) throw errorInsercion;
-            console.log("¡Registrado con éxito en Supabase!", nuevoUsuario);
-            
-            // Guardamos el usuario en el estado global para que el álbum sepa quién eres
-            STATE.usuarioActual = nuevoUsuario;
-
-        } else {
-            console.log("Bienvenido de nuevo:", usuarioExistente.nombre);
-            
-            // Guardamos el usuario existente en el estado global
-            STATE.usuarioActual = usuarioExistente;
-        }
-
-        // 3. Opcional: Si tienes una función que dibuja el álbum, puedes llamarla aquí abajo
-        // para que muestre las barajitas de STATE.usuarioActual.id
-
-    } catch (err) {
-        console.error("Error en autoRegistroSupabase:", err.message);
-    }
-}
-
-// Ejecutar la verificación al iniciar el documento
-document.addEventListener("DOMContentLoaded", () => {
-    verificarUsuarioTelegram();
-});
-// ==========================================
-// Función que se ejecuta al presionar el botón azul "ENTRAR AL ÁLBUM"
-function startGame() {
-    console.log("Iniciando la experiencia del Álbum Metalizado...");
-    
-    // Intenta buscar tu pantalla de bienvenida por su ID o por su Clase
-    const welcomeScreen = document.getElementById("welcome-screen") || document.querySelector(".welcome-container") || document.querySelector("div[class*='welcome']");
-    if (welcomeScreen) {
-        welcomeScreen.style.setProperty("display", "none", "important");
-        welcomeScreen.style.display = "none";
-    } else {
-        console.error("No se encontró el contenedor de la pantalla de bienvenida.");
-    }
-}
-   
-    async function purgeAllData() {
-      if (!confirm("⚠️ ¿Estás absolutamente seguro de ejecutar una PURGA TOTAL?\nSe borrarán todas las transacciones, usuarios, registros de local storage y datos de prueba.")) return;
-
-      if (STATE.supabase) {
-        await STATE.supabase.from('transacciones').delete().neq('usuario_id', '');
-        await STATE.supabase.from('retiros_premios').delete().neq('usuario_id', '');
-        await STATE.supabase.from('usuarios').delete().neq('id', '');
+    function purgeAllData() {
+      if (confirm('⚠️ ¿Estás seguro de REINICIAR Y PURGAR todos los datos locales?')) {
+        localStorage.clear();
+        location.reload();
       }
-
-      localStorage.clear();
-      alert('Sistema reiniciado desde cero.');
-      window.location.reload();
     }
   </script>
 </body>
