@@ -1700,7 +1700,7 @@ async function autoRegistroTelegram(id, nombre, username) {
     // ==========================================
 // REGISTRO AUTOMÁTICO DE TELEGRAM MINI APP
 // ==========================================
-const tg = window.Telegram.WebApp;
+tg = window.Telegram.WebApp;
 tg.ready();
 tg.expand();
 
@@ -1788,8 +1788,26 @@ document.addEventListener("DOMContentLoaded", () => {
     verificarUsuarioTelegram();
 });
 // ==========================================
+// Función que se ejecuta al presionar el botón azul "ENTRAR AL ÁLBUM"
+function startGame() {
+    console.log("Iniciando la experiencia del Álbum Metalizado...");
+    
+    // Ocultamos la pantalla de bienvenida/carga
+    const welcomeScreen = document.getElementById("welcome-screen") || document.querySelector(".welcome-container");
+    if (welcomeScreen) {
+        welcomeScreen.style.display = "none";
+    }
+    
+    // Mostramos la interfaz principal del álbum
+    const appContainer = document.getElementById("app") || document.getElementById("main-container");
+    if (appContainer) {
+        appContainer.style.display = "block";
+    }
 
-
+    // Si tu código maneja la carga visual de las barajitas mediante otra función, 
+    // puedes invocarla aquí mismo.
+}
+    
     async function purgeAllData() {
       if (!confirm("⚠️ ¿Estás absolutamente seguro de ejecutar una PURGA TOTAL?\nSe borrarán todas las transacciones, usuarios, registros de local storage y datos de prueba.")) return;
 
