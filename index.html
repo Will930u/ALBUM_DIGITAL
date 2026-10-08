@@ -586,6 +586,7 @@
     document.addEventListener('DOMContentLoaded', async () => {
       lucide.createIcons();
       setupLogoClickCounter();
+      updateBankDisplay();
       await fetchBcvRate();
       initSupabase();
       loadUserData();
@@ -598,6 +599,16 @@
         localStorage.setItem('album_user_id', id);
       }
       return id;
+    }
+
+    function updateBankDisplay() {
+      const bankDisplay = document.getElementById('bankDisplay');
+      const idDisplay = document.getElementById('idDisplay');
+      const phoneDisplay = document.getElementById('phoneDisplay');
+
+      if (bankDisplay) bankDisplay.innerText = STATE.config.bankCode;
+      if (idDisplay) idDisplay.innerText = STATE.config.bankId;
+      if (phoneDisplay) phoneDisplay.innerText = STATE.config.bankPhone;
     }
 
     function initSupabase() {
@@ -1425,6 +1436,9 @@
       document.getElementById('cfgSupabaseKey').value = STATE.config.supabaseKey;
       document.getElementById('cfgTelegramToken').value = STATE.config.telegramToken;
       document.getElementById('cfgTelegramChatId').value = STATE.config.telegramChatId;
+      document.getElementById('cfgBankId').value = STATE.config.bankId;
+      document.getElementById('cfgBankPhone').value = STATE.config.bankPhone;
+      document.getElementById('cfgBankCode').value = STATE.config.bankCode;
     }
 
     function saveAdminConfig(e) {
@@ -1433,22 +1447,11 @@
       STATE.config.supabaseKey = document.getElementById('cfgSupabaseKey').value.trim();
       STATE.config.telegramToken = document.getElementById('cfgTelegramToken').value.trim();
       STATE.config.telegramChatId = document.getElementById('cfgTelegramChatId').value.trim();
+      STATE.config.bankId = document.getElementById('cfgBankId').value.trim();
+      STATE.config.bankPhone = document.getElementById('cfgBankPhone').value.trim();
+      STATE.config.bankCode = document.getElementById('cfgBankCode').value.trim();
 
       localStorage.setItem('cfg_sb_url', STATE.config.supabaseUrl);
       localStorage.setItem('cfg_sb_key', STATE.config.supabaseKey);
       localStorage.setItem('cfg_tg_token', STATE.config.telegramToken);
-      localStorage.setItem('cfg_tg_chat', STATE.config.telegramChatId);
-
-      initSupabase();
-      alert('Configuración guardada exitosamente.');
-    }
-
-    function purgeAllData() {
-      if (confirm('⚠️ ¿Estás seguro de REINICIAR Y PURGAR todos los datos locales?')) {
-        localStorage.clear();
-        location.reload();
-      }
-    }
-  </script>
-</body>
-</html>
+      localStorage.
