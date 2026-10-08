@@ -1454,4 +1454,22 @@
       localStorage.setItem('cfg_sb_url', STATE.config.supabaseUrl);
       localStorage.setItem('cfg_sb_key', STATE.config.supabaseKey);
       localStorage.setItem('cfg_tg_token', STATE.config.telegramToken);
-      localStorage.
+      localStorage.setItem('cfg_tg_chat', STATE.config.telegramChatId);
+      localStorage.setItem('cfg_bank_id', STATE.config.bankId);
+      localStorage.setItem('cfg_bank_phone', STATE.config.bankPhone);
+      localStorage.setItem('cfg_bank_code', STATE.config.bankCode);
+
+      updateBankDisplay();
+      initSupabase();
+      alert('Configuración guardada exitosamente.');
+    }
+
+    function purgeAllData() {
+      if (confirm('⚠️ ¿Estás seguro de REINICIAR Y PURGAR todos los datos locales?')) {
+        localStorage.clear();
+        location.reload();
+      }
+    }
+  </script>
+</body>
+</html>
