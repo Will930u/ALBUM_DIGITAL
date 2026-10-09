@@ -386,3 +386,52 @@ function setupLogoClickCounter() {
 function exitAdmin() {
   switchTab('album');
 }
+async function handleResetPassword(e) {
+  e.preventDefault();
+  const newPassword = document.getElementById('newPasswordInput').value.trim();
+  const btn = e.target.querySelector('button[type="submit"]');
+
+  if (!newPassword || newPassword.length < 6) {
+    alert("La contraseña debe tener al menos 6 caracteres.");
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerText = "GUARDANDO...";
+
+  try {
+    // 1. Actualizar contraseña en Supabase Auth
+    const { data, error } = await STATE.supabase.auth.updateUser({
+      password: newPassword
+    });
+
+    if (error) {
+      alert(`Error al actualizar clave en Supabase: ${error.message}`);
+      return;
+    }
+
+    // Obtener el correo del usuario recuperado
+    const userEmail = data.user ? data.user.email : null;
+
+    // 2. Sincronizar nueva contraseña con el Backend en Render (public.usuarios)
+    if (userEmail) {
+      await fetch(`${API_URL}/api/update-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          gmail: userEmail,
+          new_password: newPassword
+        })
+      });
+    }
+
+    alert("✅ ¡Contraseña actualizada con éxito! Ya puedes iniciar sesión con tu nueva clave.");
+    showAuthTab('login');
+  } catch (err) {
+    console.error("Error al restablecer contraseña:", err);
+    alert("Ocurrió un error inesperado al actualizar la contraseña.");
+  } finally {
+    btn.disabled = false;
+    btn.innerText = "ACTUALIZAR CONTRASEÑA";
+  }
+}
