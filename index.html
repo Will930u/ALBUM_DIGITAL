@@ -146,6 +146,20 @@
         </button>
       </form>
     </section>
+    <!-- FORMULARIO NUEVA CONTRASEÑA -->
+    <form id="resetPasswordForm" class="hidden flex flex-col gap-4" onsubmit="handleResetPassword(event)">
+      <div>
+        <label class="block text-xs font-semibold text-purple-300 uppercase mb-1">Nueva Contraseña</label>
+        
+        <input type="password" id="newPasswordInput" required minlength="6" placeholder="Mínimo 6 caracteres"
+          class="w-full bg-slate-900 border border-purple-500/40 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-purple-400">
+      
+      </div>
+      <button type="submit"
+        class="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold py-3 rounded-xl transition duration-200 shadow-lg shadow-purple-900/40 mt-2">
+        ACTUALIZAR CONTRASEÑA
+      </button>
+    </form>
 
     <!-- 2. VISTA ÁLBUM DE BARAJITAS -->
     <section id="albumSection" class="hidden w-full max-w-6xl space-y-6">
