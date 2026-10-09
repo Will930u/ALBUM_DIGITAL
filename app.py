@@ -295,7 +295,9 @@ def webhook_telegram():
         })
 
     return jsonify({"status": "ok"}), 200
-    @app.route("/api/update-password", methods=["POST"])
+
+# ENDPOINT PARA ACTUALIZAR CONTRASEÑA EN LA TABLA public.usuarios
+@app.route("/api/update-password", methods=["POST"])
 def update_password():
     data = request.get_json(silent=True) or {}
     gmail = data.get("gmail")
@@ -309,7 +311,7 @@ def update_password():
             supabase_client.table("usuarios").update({
                 "password_hash": new_password
             }).eq("gmail", gmail).execute()
-            return jsonify({"status": "success", "message": "Contraseña actualizada en tabla usuarios"}), 200
+            return jsonify({"status": "success", "message": "Contraseña actualizada en la tabla usuarios"}), 200
         except Exception as e:
             return jsonify({"status": "error", "details": str(e)}), 500
 
