@@ -71,7 +71,7 @@ def register():
 
     if supabase_client:
         try:
-            # 1. Crear el usuario en Supabase Auth (necesario para recuperación por correo)
+            # 1. Registrar en Supabase Auth (indispensable para enviar correos de recuperación)
             try:
                 supabase_client.auth.admin.create_user({
                     "email": gmail,
@@ -79,9 +79,9 @@ def register():
                     "email_confirm": True
                 })
             except Exception as auth_err:
-                print(f"Nota en Supabase Auth: {auth_err}")
+                print(f"Aviso en Supabase Auth: {auth_err}")
 
-            # 2. Registrar en la tabla public.usuarios con tus datos de Pago Móvil
+            # 2. Registrar en tu tabla public.usuarios con tus columnas exactas
             res = supabase_client.table("usuarios").insert({
                 "id": user_id,
                 "nombre": username,
@@ -91,17 +91,15 @@ def register():
                 "banco": banco,
                 "cedula": cedula,
                 "telefono": telefono,
-                "saldo_usd": 0.0,
-                "saldo_bs": 0.0,
-                "cantidad_barajitas": 0
+                "saldo_usd": 0.0
             }).execute()
 
             user_data = res.data[0] if res.data else {"id": user_id, "username": username}
             return jsonify({"status": "success", "user": user_data}), 200
         except Exception as e:
-            return jsonify({"status": "error", "message": "El nombre de usuario o datos ya están en uso", "details": str(e)}), 400
+            return jsonify({"status": "error", "message": "El usuario o datos ya existen", "details": str(e)}), 400
 
-    return jsonify({"status": "error", "message": "Base de datos no configurada"}), 500
+    return jsonify({"status": "error", "message": "Base de datos no disponible"}), 500
 
 @app.route("/api/login", methods=["POST"])
 def login():
