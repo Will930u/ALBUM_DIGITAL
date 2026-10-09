@@ -23,6 +23,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   initSupabase();
   await fetchBcvRate();
   checkSession();
+
+  // Escuchar si el usuario llegó desde un correo de recuperación
+  if (STATE.supabase) {
+    STATE.supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        console.log("Modo recuperación de contraseña detectado");
+        showAuthTab('reset');
+      }
+    });
+  }
 });
 
 // Inicialización de Supabase con ventana y seguridad
@@ -66,6 +76,8 @@ function showAuthTab(tab) {
   document.getElementById('loginForm').classList.add('hidden');
   document.getElementById('registerForm').classList.add('hidden');
   document.getElementById('forgotForm').classList.add('hidden');
+  const resetForm = document.getElementById('resetPasswordForm');
+  if (resetForm) resetForm.classList.add('hidden');
 
   if (tab === 'login') {
     document.getElementById('loginForm').classList.remove('hidden');
@@ -76,6 +88,9 @@ function showAuthTab(tab) {
   } else if (tab === 'forgot') {
     document.getElementById('forgotForm').classList.remove('hidden');
     document.getElementById('authTitle').innerText = 'RECUPERAR CLAVE';
+  } else if (tab === 'reset') {
+    if (resetForm) resetForm.classList.remove('hidden');
+    document.getElementById('authTitle').innerText = 'NUEVA CONTRASEÑA';
   }
 }
 
