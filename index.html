@@ -317,7 +317,7 @@
   </main>
 
   <script>
-    // Inicializar Telegram WebApp
+    // Inicializar Telegram WebApp nativo
     let telegramUser = null;
     if (window.Telegram && window.Telegram.WebApp) {
       window.Telegram.WebApp.ready();
@@ -338,8 +338,8 @@
       logoClicks: 0,
       clickTimer: null,
       backendUrl: localStorage.getItem('cfg_backend_url') || 'https://album-digital.onrender.com',
-      supabaseUrl: localStorage.getItem('cfg_sb_url') || 'https://tu-proyecto.supabase.co',
-      supabaseKey: localStorage.getItem('cfg_sb_key') || 'tu-anon-key',
+      supabaseUrl: localStorage.getItem('cfg_sb_url') || '',
+      supabaseKey: localStorage.getItem('cfg_sb_key') || '',
       supabase: null
     };
 
@@ -352,8 +352,8 @@
     });
 
     function getOrCreateUserId() {
-      if (telegramUser && telegramUser.id) {
-        return 'TG-' + telegramUser.id;
+      if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initDataUnsafe && window.Telegram.WebApp.initDataUnsafe.user) {
+        return String(window.Telegram.WebApp.initDataUnsafe.user.id);
       }
       let id = localStorage.getItem('album_user_id');
       if (!id) {
@@ -387,13 +387,15 @@
 
     async function syncUserWithBackend() {
       if (!STATE.backendUrl) return;
+      const nombreUsuario = telegramUser ? ([telegramUser.first_name, telegramUser.last_name].filter(Boolean).join(' ') || telegramUser.username || 'Usuario Telegram') : 'Usuario Web';
+
       try {
         await fetch(`${STATE.backendUrl}/api/sincronizar-usuario`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
             usuario_id: STATE.userId,
-            nombre: telegramUser ? (telegramUser.first_name + ' ' + (telegramUser.last_name || '')) : 'Usuario Web'
+            nombre: nombreUsuario
           })
         });
       } catch (e) {}
@@ -452,7 +454,7 @@
 
         if (isMilestone) slot.onclick = () => openWithdrawModal(i);
 
-        if (isUnlocked) {
+        if (isUnlocked && STATE.supabaseUrl) {
           const imgUrl = `${STATE.supabaseUrl}/storage/v1/object/public/barajitas/${i}.jpg`;
           slot.innerHTML = `<img src="${imgUrl}" class="w-full h-full object-cover rounded-lg"><span class="absolute bottom-1 right-1 bg-black/80 px-1.5 py-0.5 rounded text-[10px] font-bold text-purple-300">#${i}</span>`;
         } else {
@@ -519,7 +521,6 @@
 
         // 2. Mecanismo Antifallos: Inserción directa en Supabase desde cliente si la BD del backend falló
         if (STATE.supabase && (!resData.db_saved)) {
-          console.log("Activando inserción directa de respaldo en Supabase...");
           await STATE.supabase.from('compras').insert({
             usuario_id: String(STATE.userId),
             barajitas_qty: qty,
