@@ -117,10 +117,39 @@ async function handleLogin(e) {
   }
 }
 
-function handleForgotPassword(e) {
+async function handleForgotPassword(e) {
   e.preventDefault();
-  alert('Se ha enviado la solicitud de recuperación a tu correo Gmail registrado.');
-  showAuthTab('login');
+  
+  const emailInput = document.getElementById('forgotInput').value.trim();
+  const btn = e.target.querySelector('button[type="submit"]');
+  
+  if (!emailInput) {
+    alert("Por favor ingresa tu correo Gmail registrado.");
+    return;
+  }
+
+  btn.disabled = true;
+  btn.innerText = "ENVIANDO...";
+
+  try {
+    // Solicitud real a Supabase Auth para enviar el correo
+    const { data, error } = await STATE.supabase.auth.resetPasswordForEmail(emailInput, {
+      redirectTo: 'https://will930u.github.io/ALBUM_DIGITAL/'
+    });
+
+    if (error) {
+      alert(`Error al enviar correo: ${error.message}`);
+    } else {
+      alert(`✅ Se ha enviado un enlace de recuperación a ${emailInput}. Revisa tu bandeja de entrada y la carpeta de Spam.`);
+      showAuthTab('login');
+    }
+  } catch (err) {
+    console.error("Error en forgotPassword:", err);
+    alert("Ocurrió un error al conectar con Supabase.");
+  } finally {
+    btn.disabled = false;
+    btn.innerText = "ENVIAR ENLACE DE RECUPERACIÓN";
+  }
 }
 
 function logoutUser() {
