@@ -13,15 +13,34 @@ const STATE = {
   claimedMilestones: [],
   selectedMilestone: null,
   isProcessingWithdrawal: false,
-  logoClicks: 0
+  logoClicks: 0,
+  supabase: null
 };
 
 document.addEventListener('DOMContentLoaded', async () => {
   lucide.createIcons();
   setupLogoClickCounter();
+  initSupabase();
   await fetchBcvRate();
   checkSession();
 });
+
+// Inicialización de Supabase con ventana y seguridad
+function initSupabase() {
+  const SUPABASE_URL = "https://dxicbitnnesjsqzxisea.supabase.co"; // Coloca tu URL de Supabase
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR4aWNiaXRubmVzanNxenhpc2VhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE0MTQzMTMsImV4cCI6MjEwNjk5MDMxM30.0xUXIa0Bby7xpJAF_N3y-n_H3SPwVlUBb9m630AFPtw"; // Coloca tu Anon Key de Supabase
+
+  if (window.supabase && SUPABASE_URL && SUPABASE_ANON_KEY) {
+    try {
+      STATE.supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      console.log("Supabase inicializado correctamente.");
+    } catch (e) {
+      console.error("Error al inicializar Supabase:", e);
+    }
+  } else {
+    console.error("La librería de Supabase no se cargó correctamente desde el CDN.");
+  }
+}
 
 async function fetchBcvRate() {
   try {
@@ -62,13 +81,17 @@ function showAuthTab(tab) {
 
 async function handleRegister(e) {
   e.preventDefault();
+  const btn = e.target.querySelector('button[type="submit"]');
+  btn.disabled = true;
+  btn.innerText = "REGISTRANDO...";
+
   const payload = {
-    username: document.getElementById('regUsername').value,
+    username: document.getElementById('regUsername').value.trim(),
     password: document.getElementById('regPassword').value,
-    gmail: document.getElementById('regGmail').value,
-    banco: document.getElementById('regBanco').value,
-    cedula: document.getElementById('regCedula').value,
-    telefono: document.getElementById('regTelefono').value
+    gmail: document.getElementById('regGmail').value.trim(),
+    banco: document.getElementById('regBanco').value.trim(),
+    cedula: document.getElementById('regCedula').value.trim(),
+    telefono: document.getElementById('regTelefono').value.trim()
   };
 
   try {
@@ -78,7 +101,7 @@ async function handleRegister(e) {
       body: JSON.stringify(payload)
     });
     const data = await res.json();
-    if (data.status === 'success') {
+    if (res.ok && data.status === 'success') {
       alert('¡Registro exitoso! Iniciando sesión...');
       STATE.user = data.user;
       localStorage.setItem('album_user', JSON.stringify(data.user));
@@ -87,14 +110,21 @@ async function handleRegister(e) {
       alert(data.message || 'Error en el registro');
     }
   } catch (err) {
-    alert('Error de conexión con el servidor');
+    alert('Error de conexión con el servidor en Render');
+  } finally {
+    btn.disabled = false;
+    btn.innerText = "CREAR CUENTA Y CONTINUAR";
   }
 }
 
 async function handleLogin(e) {
   e.preventDefault();
+  const btn = e.target.querySelector('button[type="submit"]');
+  btn.disabled = true;
+  btn.innerText = "VERIFICANDO...";
+
   const payload = {
-    username: document.getElementById('loginUsername').value,
+    username: document.getElementById('loginUsername').value.trim(),
     password: document.getElementById('loginPassword').value
   };
 
@@ -105,7 +135,7 @@ async function handleLogin(e) {
       body: JSON.stringify(payload)
     });
     const data = await res.json();
-    if (data.status === 'success') {
+    if (res.ok && data.status === 'success') {
       STATE.user = data.user;
       localStorage.setItem('album_user', JSON.stringify(data.user));
       showAppMain();
@@ -114,22 +144,33 @@ async function handleLogin(e) {
     }
   } catch (err) {
     alert('Error conectando al servidor');
+  } finally {
+    btn.disabled = false;
+    btn.innerText = "INGRESAR AL ÁLBUM";
   }
 }
 
 async function handleForgotPassword(e) {
   e.preventDefault();
-  
   const emailInput = document.getElementById('forgotInput').value.trim();
   const btn = e.target.querySelector('button[type="submit"]');
-  
+
   if (!emailInput) {
     alert("Por favor ingresa tu correo Gmail registrado.");
     return;
   }
 
+  if (!STATE.supabase) {
+    initSupabase();
+  }
+
+  if (!STATE.supabase) {
+    alert("Error: No se pudo establecer conexión con el cliente de Supabase.");
+    return;
+  }
+
   btn.disabled = true;
-  btn.innerText = "ENVIANDO...";
+  btn.innerText = "ENVIANDO CORREO...";
 
   try {
     // Solicitud real a Supabase Auth para enviar el correo
@@ -145,7 +186,7 @@ async function handleForgotPassword(e) {
     }
   } catch (err) {
     console.error("Error en forgotPassword:", err);
-    alert("Ocurrió un error al conectar con Supabase.");
+    alert("Ocurrió un error inesperado al conectar con Supabase.");
   } finally {
     btn.disabled = false;
     btn.innerText = "ENVIAR ENLACE DE RECUPERACIÓN";
@@ -263,7 +304,7 @@ async function submitPurchase(e) {
       })
     });
     const data = await res.json();
-    if (data.status === 'success') {
+    if (res.ok && data.status === 'success') {
       alert('¡Pago reportado! Notificación con botones enviada a Telegram.');
       document.getElementById('refInput').value = '';
       switchTab('album');
@@ -305,7 +346,7 @@ async function submitWithdrawalRequest(e) {
       })
     });
     const data = await res.json();
-    if (data.status === 'success') {
+    if (res.ok && data.status === 'success') {
       alert('Solicitud enviada a Telegram para verificación.');
       closeWithdrawModal();
     }
