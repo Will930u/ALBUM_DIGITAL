@@ -1,14 +1,12 @@
 import os
-import hmac
-import hashlib
-import urllib.parse
 import requests
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from supabase import create_client, Client
 
 app = Flask(__name__)
-CORS(app)
+# Permitir peticiones CORS desde cualquier origen (incluyendo Telegram WebApp)
+CORS(app, resources={r"/*": {"origins": "*"}})
 
 # Variables de entorno configuradas en Render
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
@@ -71,16 +69,16 @@ def sincronizar_usuario():
 
     if supabase_client:
         try:
-            # Upsert en la tabla real: usuarios
             res = supabase_client.table("usuarios").upsert({
                 "id": str(usuario_id),
                 "nombre": str(nombre)
             }).execute()
             return jsonify({"status": "success", "data": res.data}), 200
         except Exception as e:
+            print(f"Error en sincronizar_usuario: {e}")
             return jsonify({"status": "error", "details": str(e)}), 500
 
-    return jsonify({"status": "warning", "message": "Supabase no configurado"}), 200
+    return jsonify({"status": "warning", "message": "Supabase no configurado en servidor"}), 200
 
 @app.route("/api/notificar-compra", methods=["POST"])
 def notificar_compra():
@@ -94,12 +92,13 @@ def notificar_compra():
     if not all([usuario_id, barajitas_qty, monto_bs, referencia]):
         return jsonify({"status": "error", "message": "Campos incompletos"}), 400
 
+    db_saved = False
     if supabase_client:
         try:
-            # 1. Registro o actualización en 'usuarios'
+            # 1. Asegurar usuario
             supabase_client.table("usuarios").upsert({"id": str(usuario_id)}).execute()
             
-            # 2. Insertar en la tabla real: compras
+            # 2. Insertar en la tabla 'compras'
             supabase_client.table("compras").insert({
                 "usuario_id": str(usuario_id),
                 "barajitas_qty": int(barajitas_qty),
@@ -109,7 +108,7 @@ def notificar_compra():
                 "estado": "pendiente"
             }).execute()
 
-            # 3. Registrar en la tabla historial: transacciones
+            # 3. Insertar en 'transacciones'
             supabase_client.table("transacciones").insert({
                 "usuario_id": str(usuario_id),
                 "barajitas_qty": int(barajitas_qty),
@@ -117,19 +116,25 @@ def notificar_compra():
                 "referencia": str(referencia),
                 "estado": "pendiente"
             }).execute()
+            db_saved = True
         except Exception as e:
-            print(f"Error guardando compra en Supabase: {e}")
+            print(f"ERROR CRÍTICO AL INSERTAR EN SUPABASE DESDE FLASK: {e}")
 
     mensaje = (
         f"🛒 *NUEVA SOLICITUD DE COMPRA*\n\n"
         f"👤 *Usuario:* `{usuario_id}`\n"
         f"🎴 *Barajitas:* {barajitas_qty}\n"
         f"💰 *Monto:* Bs. {float(monto_bs):.2f} (${float(monto_usd):.2f})\n"
-        f"🔢 *Referencia:* `{referencia}`"
+        f"🔢 *Referencia:* `{referencia}`\n"
+        f"💾 *Guardado en BD:* {'SÍ' if db_saved else 'NO (Revisar Supabase)'}"
     )
 
     sent = send_telegram_message(TELEGRAM_ADMIN_CHAT_ID, mensaje)
-    return jsonify({"status": "success", "telegram_sent": sent}), 200
+    return jsonify({
+        "status": "success", 
+        "telegram_sent": sent,
+        "db_saved": db_saved
+    }), 200
 
 @app.route("/api/notificar-retiro", methods=["POST"])
 def notificar_retiro():
@@ -146,7 +151,6 @@ def notificar_retiro():
 
     if supabase_client:
         try:
-            # Seleccionar tabla según el tipo de solicitud (retiros_premios o retiros)
             tabla_destino = "retiros_premios" if tipo == "hito_parcial" else "retiros"
             supabase_client.table(tabla_destino).insert({
                 "usuario_id": str(usuario_id),
@@ -164,8 +168,7 @@ def notificar_retiro():
             f"🔴 *SOLICITUD DE LIQUIDACIÓN TOTAL*\n\n"
             f"👤 *Usuario:* `{usuario_id}`\n"
             f"💰 *Monto Total:* Bs. {float(monto_bs):.2f} (${float(monto_usd):.2f} USD)\n"
-            f"🏦 *Pago Móvil:* {datos_pago}\n"
-            f"⚠️ *Acción:* Vaciar álbum al aprobar."
+            f"🏦 *Pago Móvil:* {datos_pago}"
         )
     else:
         mensaje = (
