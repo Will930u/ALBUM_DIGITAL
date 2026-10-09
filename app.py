@@ -23,17 +23,20 @@ if SUPABASE_URL and SUPABASE_KEY:
         print(f"Error al inicializar Supabase: {e}")
 
 def send_telegram_message(chat_id: str, text: str):
-    """Auxiliar para enviar notificaciones a Telegram."""
+    """Auxiliar para enviar notificaciones a Telegram mediante HTML."""
     if not TELEGRAM_BOT_TOKEN or not chat_id:
+        print("Falta TELEGRAM_BOT_TOKEN o TELEGRAM_ADMIN_CHAT_ID")
         return False
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     payload = {
         "chat_id": chat_id,
         "text": text,
-        "parse_mode": "Markdown"
+        "parse_mode": "HTML"
     }
     try:
         res = requests.post(url, json=payload, timeout=10)
+        if not res.ok:
+            print(f"Error Telegram API: {res.status_code} - {res.text}")
         return res.ok
     except Exception as e:
         print(f"Error notificando a Telegram: {e}")
@@ -73,7 +76,7 @@ def sincronizar_usuario():
                 "id": str(usuario_id),
                 "nombre": str(nombre)
             }).execute()
-            return jsonify({"status": "success", "data": res.data}), 200
+            return jsonify({"status": "success", "message": "Usuario sincronizado"}), 200
         except Exception as e:
             print(f"Error en sincronizar_usuario: {e}")
             return jsonify({"status": "error", "details": str(e)}), 500
@@ -96,8 +99,11 @@ def notificar_compra():
     if supabase_client:
         try:
             # 1. Asegurar usuario
-            supabase_client.table("usuarios").upsert({"id": str(usuario_id)}).execute()
-            
+            try:
+                supabase_client.table("usuarios").upsert({"id": str(usuario_id)}).execute()
+            except Exception as u_err:
+                print(f"Advertencia al asegurar usuario: {u_err}")
+
             # 2. Insertar en la tabla 'compras'
             supabase_client.table("compras").insert({
                 "usuario_id": str(usuario_id),
@@ -109,24 +115,29 @@ def notificar_compra():
             }).execute()
 
             # 3. Insertar en 'transacciones'
-            supabase_client.table("transacciones").insert({
-                "usuario_id": str(usuario_id),
-                "barajitas_qty": int(barajitas_qty),
-                "monto_bs": float(monto_bs),
-                "referencia": str(referencia),
-                "estado": "pendiente"
-            }).execute()
+            try:
+                supabase_client.table("transacciones").insert({
+                    "usuario_id": str(usuario_id),
+                    "barajitas_qty": int(barajitas_qty),
+                    "monto_bs": float(monto_bs),
+                    "referencia": str(referencia),
+                    "estado": "pendiente"
+                }).execute()
+            except Exception as t_err:
+                print(f"Advertencia al insertar transaccion: {t_err}")
+
             db_saved = True
         except Exception as e:
             print(f"ERROR CRÍTICO AL INSERTAR EN SUPABASE DESDE FLASK: {e}")
 
+    # Mensaje formateado en HTML para evitar fallos de parseo
     mensaje = (
-        f"🛒 *NUEVA SOLICITUD DE COMPRA*\n\n"
-        f"👤 *Usuario:* `{usuario_id}`\n"
-        f"🎴 *Barajitas:* {barajitas_qty}\n"
-        f"💰 *Monto:* Bs. {float(monto_bs):.2f} (${float(monto_usd):.2f})\n"
-        f"🔢 *Referencia:* `{referencia}`\n"
-        f"💾 *Guardado en BD:* {'SÍ' if db_saved else 'NO (Revisar Supabase)'}"
+        f"🛒 <b>NUEVA SOLICITUD DE COMPRA</b>\n\n"
+        f"👤 <b>Usuario:</b> <code>{usuario_id}</code>\n"
+        f"🎴 <b>Barajitas:</b> {barajitas_qty}\n"
+        f"💰 <b>Monto:</b> Bs. {float(monto_bs):.2f} (${float(monto_usd):.2f})\n"
+        f"🔢 <b>Referencia:</b> <code>{referencia}</code>\n"
+        f"💾 <b>Guardado en BD:</b> {'SÍ' if db_saved else 'NO (Revisar Supabase)'}"
     )
 
     sent = send_telegram_message(TELEGRAM_ADMIN_CHAT_ID, mensaje)
@@ -165,18 +176,18 @@ def notificar_retiro():
 
     if tipo == "liquidacion_total":
         mensaje = (
-            f"🔴 *SOLICITUD DE LIQUIDACIÓN TOTAL*\n\n"
-            f"👤 *Usuario:* `{usuario_id}`\n"
-            f"💰 *Monto Total:* Bs. {float(monto_bs):.2f} (${float(monto_usd):.2f} USD)\n"
-            f"🏦 *Pago Móvil:* {datos_pago}"
+            f"🔴 <b>SOLICITUD DE LIQUIDACIÓN TOTAL</b>\n\n"
+            f"👤 <b>Usuario:</b> <code>{usuario_id}</code>\n"
+            f"💰 <b>Monto Total:</b> Bs. {float(monto_bs):.2f} (${float(monto_usd):.2f} USD)\n"
+            f"🏦 <b>Pago Móvil:</b> {datos_pago}"
         )
     else:
         mensaje = (
-            f"🏆 *SOLICITUD DE PREMIO HITO ($200)*\n\n"
-            f"👤 *Usuario:* `{usuario_id}`\n"
-            f"🎯 *Hito:* Barajita #{milestone}\n"
-            f"💰 *Premio:* ${monto_usd} USD (Bs. {float(monto_bs):.2f})\n"
-            f"🏦 *Pago Móvil:* {datos_pago}"
+            f"🏆 <b>SOLICITUD DE PREMIO HITO ($200)</b>\n\n"
+            f"👤 <b>Usuario:</b> <code>{usuario_id}</code>\n"
+            f"🎯 <b>Hito:</b> Barajita #{milestone}\n"
+            f"💰 <b>Premio:</b> ${monto_usd} USD (Bs. {float(monto_bs):.2f})\n"
+            f"🏦 <b>Pago Móvil:</b> {datos_pago}"
         )
 
     sent = send_telegram_message(TELEGRAM_ADMIN_CHAT_ID, mensaje)
