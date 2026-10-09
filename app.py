@@ -71,7 +71,17 @@ def register():
 
     if supabase_client:
         try:
-            # Registrar usuario con datos fijos de Pago Móvil y Gmail
+            # 1. Crear el usuario en Supabase Auth (necesario para recuperación por correo)
+            try:
+                supabase_client.auth.admin.create_user({
+                    "email": gmail,
+                    "password": password,
+                    "email_confirm": True
+                })
+            except Exception as auth_err:
+                print(f"Nota en Supabase Auth: {auth_err}")
+
+            # 2. Registrar en la tabla public.usuarios con tus datos de Pago Móvil
             res = supabase_client.table("usuarios").insert({
                 "id": user_id,
                 "nombre": username,
