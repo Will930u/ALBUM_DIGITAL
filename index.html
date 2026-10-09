@@ -12,8 +12,8 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
-  <!-- JSZip CDN -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <!-- Telegram WebApp SDK -->
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
     body {
       background: radial-gradient(circle at center, #1a0b36 0%, #080314 100%);
@@ -59,7 +59,6 @@
     ::-webkit-scrollbar-track { background: #080314; }
     ::-webkit-scrollbar-thumb { background: #581c87; border-radius: 4px; }
   </style>
-  <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body class="flex flex-col min-h-screen">
   <!-- CABECERA PRINCIPAL -->
@@ -75,7 +74,7 @@
     </div>
     
     <div class="flex items-center space-x-3">
-      <button id="btnHeaderMilestone" onclick="openWithdrawModal()" class="px-3.5 py-1.5 rounded-full bg-gradient-to-r from-amber-500 to-emerald-600 hover:from-amber-400 hover:to-emerald-500 text-white font-bold text-xs flex items-center space-x-1.5 shadow-lg border border-amber-300/40 transition transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">
+      <button id="btnHeaderMilestone" onclick="openWithdrawModal()" class="px-3.5 py-1.5 rounded-full bg-gradient-to-r from-amber-500 to-emerald-600 hover:from-amber-400 hover:to-emerald-500 text-white font-bold text-xs flex items-center space-x-1.5 shadow-lg border border-amber-300/40 transition transform active:scale-95">
         <i data-lucide="award" class="w-4 h-4"></i>
         <span>Premio Hito ($200)</span>
       </button>
@@ -84,10 +83,6 @@
         <i data-lucide="wallet" class="w-4 h-4 text-purple-400"></i>
         <span class="text-xs text-slate-400">Valor Neto:</span>
         <span id="userBalanceBs" class="font-bold text-emerald-400 text-sm">Bs. 0.00 ($0.00)</span>
-        
-        <button id="btnHeaderTotalLiquidate" onclick="confirmTotalLiquidate()" title="Liquidar 100% del saldo y resetear álbum" class="ml-1 px-2 py-0.5 rounded-full bg-red-600/80 hover:bg-red-500 text-white font-extrabold text-[10px] uppercase border border-red-400/50 transition disabled:opacity-50 disabled:cursor-not-allowed">
-          Liquidar Todo
-        </button>
       </div>
 
       <nav class="flex space-x-2">
@@ -186,9 +181,9 @@
         <div class="bg-purple-950/30 border border-purple-500/40 p-4 rounded-xl space-y-2">
           <h3 class="text-xs font-bold text-purple-300 uppercase tracking-wider">Datos para Pago Móvil</h3>
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
-            <div><span class="text-slate-400">Banco:</span> <strong class="text-white block" id="bankDisplay">0134 (Banesco)</strong></div>
-            <div><span class="text-slate-400">Cédula:</span> <strong class="text-white block" id="idDisplay">21101658</strong></div>
-            <div><span class="text-slate-400">Teléfono:</span> <strong class="text-white block" id="phoneDisplay">04129830982</strong></div>
+            <div><span class="text-slate-400">Banco:</span> <strong class="text-white block">0134 (Banesco)</strong></div>
+            <div><span class="text-slate-400">Cédula:</span> <strong class="text-white block">21101658</strong></div>
+            <div><span class="text-slate-400">Teléfono:</span> <strong class="text-white block">04129830982</strong></div>
           </div>
         </div>
         <form onsubmit="submitPurchase(event)" class="space-y-4">
@@ -214,7 +209,7 @@
             </div>
             <div>
               <h2 class="text-2xl font-bold glow-text">PANEL DE ADMINISTRACIÓN</h2>
-              <p class="text-xs text-purple-300">Gestión de pagos, solicitudes, imágenes, caja y expedientes.</p>
+              <p class="text-xs text-purple-300">Gestión de compras, retiros y configuración.</p>
             </div>
           </div>
           <button onclick="exitAdmin()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold border border-slate-700 transition">
@@ -225,23 +220,11 @@
         <div class="flex border-b border-slate-800 space-x-4 overflow-x-auto">
           <button onclick="switchAdminTab('pagos')" id="tabAdminPagos" class="pb-3 font-semibold text-sm border-b-2 border-purple-500 text-purple-300 flex items-center space-x-2 whitespace-nowrap">
             <i data-lucide="clock" class="w-4 h-4"></i>
-            <span>Pagos Pendientes</span>
+            <span>Pagos Pendientes ('compras')</span>
           </button>
-          <button onclick="switchAdminTab('retiros_premiosAdmin')" id="tabAdminretiros_premios" class="pb-3 font-semibold text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center space-x-2 whitespace-nowrap">
+          <button onclick="switchAdminTab('retirosAdmin')" id="tabAdminRetiros" class="pb-3 font-semibold text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center space-x-2 whitespace-nowrap">
             <i data-lucide="arrow-down-circle" class="w-4 h-4"></i>
-            <span>Solicitudes de Retiro</span>
-          </button>
-          <button onclick="switchAdminTab('imagenesAdmin')" id="tabAdminImagenes" class="pb-3 font-semibold text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center space-x-2 whitespace-nowrap">
-            <i data-lucide="image" class="w-4 h-4"></i>
-            <span>Gestión Masiva de Imágenes</span>
-          </button>
-          <button onclick="switchAdminTab('metricas')" id="tabAdminMetricas" class="pb-3 font-semibold text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center space-x-2 whitespace-nowrap">
-            <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
-            <span>Métricas y Caja Dinámica</span>
-          </button>
-          <button onclick="switchAdminTab('usuarios')" id="tabAdminUsuarios" class="pb-3 font-semibold text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center space-x-2 whitespace-nowrap">
-            <i data-lucide="users" class="w-4 h-4"></i>
-            <span>Usuarios y Expedientes</span>
+            <span>Solicitudes de Retiro ('retiros_premios')</span>
           </button>
           <button onclick="switchAdminTab('config')" id="tabAdminConfig" class="pb-3 font-semibold text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center space-x-2 whitespace-nowrap">
             <i data-lucide="settings" class="w-4 h-4"></i>
@@ -249,19 +232,19 @@
           </button>
         </div>
 
-        <!-- TAB 1: PAGOS PENDIENTES (Tabla: compras) -->
+        <!-- TAB 1: PAGOS PENDIENTES ('compras') -->
         <div id="adminContentPagos" class="space-y-4">
           <h3 class="text-sm font-bold text-purple-200">Aprobación Manual de Compras (Tabla: 'compras')</h3>
           <div class="overflow-x-auto">
             <table class="w-full text-left text-sm text-slate-300">
               <thead class="bg-slate-900/80 text-xs uppercase text-purple-300 border-b border-purple-500/30">
                 <tr>
-                  <th class="p-3">Fecha/Hora</th>
+                  <th class="p-3">Fecha</th>
                   <th class="p-3">Usuario ID</th>
                   <th class="p-3">Barajitas</th>
-                  <th class="p-3">Monto (Bs. / USD)</th>
+                  <th class="p-3">Monto (Bs.)</th>
                   <th class="p-3">Referencia</th>
-                  <th class="p-3 text-center">Acciones</th>
+                  <th class="p-3 text-center">Acción</th>
                 </tr>
               </thead>
               <tbody id="pendingPaymentsTable"></tbody>
@@ -269,8 +252,8 @@
           </div>
         </div>
 
-        <!-- TAB 2: SOLICITUDES DE RETIRO (Tabla: retiros_premios) -->
-        <div id="adminContentretiros_premios" class="hidden space-y-4">
+        <!-- TAB 2: SOLICITUDES DE RETIRO ('retiros_premios') -->
+        <div id="adminContentRetiros" class="hidden space-y-4">
           <h3 class="text-sm font-bold text-amber-300">Solicitudes de Retiro (Tabla: 'retiros_premios')</h3>
           <div class="overflow-x-auto">
             <table class="w-full text-left text-sm text-slate-300">
@@ -278,10 +261,10 @@
                 <tr>
                   <th class="p-3">Fecha</th>
                   <th class="p-3">Usuario ID</th>
-                  <th class="p-3">Tipo / Hito</th>
-                  <th class="p-3">Monto (Bs. / USD)</th>
-                  <th class="p-3">Datos Pago Móvil</th>
-                  <th class="p-3 text-center">Acciones</th>
+                  <th class="p-3">Hito</th>
+                  <th class="p-3">Monto (USD)</th>
+                  <th class="p-3">Pago Móvil</th>
+                  <th class="p-3 text-center">Acción</th>
                 </tr>
               </thead>
               <tbody id="pendingWithdrawalsTable"></tbody>
@@ -289,81 +272,7 @@
           </div>
         </div>
 
-        <!-- TAB 3: IMÁGENES MASIVAS -->
-        <div id="adminContentImagenes" class="hidden space-y-6">
-          <div class="bg-slate-950/60 p-5 rounded-xl border border-purple-500/30 space-y-4">
-            <div class="border-b border-purple-500/20 pb-3">
-              <h3 class="text-base font-bold text-purple-200 flex items-center space-x-2">
-                <i data-lucide="upload-cloud" class="w-5 h-5 text-purple-400"></i>
-                <span>Carga Masiva a Supabase Storage (`/barajitas`)</span>
-              </h3>
-            </div>
-            <form onsubmit="uploadStickerImagesBatch(event)" class="space-y-4">
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label class="block text-xs font-semibold text-purple-200 mb-1">Seleccionar Imágenes o ZIP:</label>
-                  <input type="file" id="imgFileAssetBatch" accept="image/*,application/zip" multiple required class="w-full bg-slate-900 border border-purple-500/40 rounded-lg p-2 text-xs text-slate-300">
-                </div>
-                <div class="flex items-end">
-                  <button type="submit" id="btnUploadImgBatch" class="metal-button w-full py-3 rounded-lg text-xs font-bold text-white">
-                    Subir a Storage
-                  </button>
-                </div>
-              </div>
-            </form>
-            <div id="uploadProgressContainer" class="hidden space-y-2 pt-2">
-              <div class="flex justify-between text-xs font-bold">
-                <span id="uploadProgressLabel" class="text-purple-300">Procesando...</span>
-                <span id="uploadProgressCounter" class="text-emerald-400">0 / 0</span>
-              </div>
-              <div class="w-full bg-slate-900 rounded-full h-3 overflow-hidden border border-purple-500/30">
-                <div id="uploadProgressBar" class="bg-gradient-to-r from-emerald-500 to-purple-600 h-full w-0 transition-all duration-300"></div>
-              </div>
-            </div>
-            <div id="uploadStatusMessage" class="hidden p-3 rounded-lg text-xs font-bold"></div>
-          </div>
-        </div>
-
-        <!-- TAB 4: MÉTRICAS -->
-        <div id="adminContentMetricas" class="hidden space-y-6">
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div class="bg-slate-950/60 p-4 rounded-xl border border-purple-500/20 text-center">
-              <span class="text-xs text-slate-400">Volumen Ventas</span>
-              <p id="metricTotalSales" class="text-xl font-bold text-blue-400 mt-1">Bs. 0.00 ($0.00)</p>
-            </div>
-            <div class="bg-slate-950/60 p-4 rounded-xl border border-purple-500/20 text-center">
-              <span class="text-xs text-slate-400">Caja Neto Plataforma (30%)</span>
-              <p id="metricPlatformProfit" class="text-xl font-bold text-purple-400 mt-1">Bs. 0.00 ($0.00)</p>
-            </div>
-            <div class="bg-slate-950/60 p-4 rounded-xl border border-purple-500/20 text-center">
-              <span class="text-xs text-slate-400">Valor Neto Usuarios (70%)</span>
-              <p id="metricUserNetValue" class="text-xl font-bold text-emerald-400 mt-1">Bs. 0.00 ($0.00)</p>
-            </div>
-          </div>
-          <div class="bg-slate-950/60 p-4 rounded-xl border border-purple-500/20 h-64">
-            <canvas id="financialChart"></canvas>
-          </div>
-        </div>
-
-        <!-- TAB 5: USUARIOS (Tabla: usuarios) -->
-        <div id="adminContentUsuarios" class="hidden space-y-4">
-          <input type="text" id="userSearchInput" oninput="filterUserLogs()" placeholder="Buscar usuario..." class="w-full bg-slate-900 border border-purple-500/40 rounded-xl px-4 py-2 text-sm text-white focus:outline-none">
-          <div class="overflow-x-auto">
-            <table class="w-full text-left text-sm text-slate-300">
-              <thead class="bg-slate-900/80 text-xs uppercase text-purple-300 border-b border-purple-500/30">
-                <tr>
-                  <th class="p-3">Usuario ID</th>
-                  <th class="p-3">Barajitas Adquiridas</th>
-                  <th class="p-3">Total Invertido</th>
-                  <th class="p-3">Saldo Neto 70%</th>
-                </tr>
-              </thead>
-              <tbody id="userListTable"></tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- TAB 6: CONFIGURACIÓN -->
+        <!-- TAB 3: CONFIGURACIÓN -->
         <div id="adminContentConfig" class="hidden space-y-4">
           <form onsubmit="saveAdminConfig(event)" class="space-y-4 text-sm">
             <div>
@@ -375,7 +284,7 @@
               <input type="text" id="cfgSupabaseUrl" class="w-full bg-slate-900 border border-purple-500/40 rounded-lg p-2.5 text-white text-xs font-mono">
             </div>
             <div>
-              <label class="block text-xs font-semibold text-purple-200 mb-1">Supabase Key:</label>
+              <label class="block text-xs font-semibold text-purple-200 mb-1">Supabase Anon Key:</label>
               <input type="text" id="cfgSupabaseKey" class="w-full bg-slate-900 border border-purple-500/40 rounded-lg p-2.5 text-white text-xs font-mono">
             </div>
             <button type="submit" class="metal-button px-6 py-2.5 rounded-xl text-xs font-bold text-white">
@@ -408,26 +317,29 @@
   </main>
 
   <script>
+    // Inicializar Telegram WebApp
+    let telegramUser = null;
     if (window.Telegram && window.Telegram.WebApp) {
       window.Telegram.WebApp.ready();
       window.Telegram.WebApp.expand();
+      if (window.Telegram.WebApp.initDataUnsafe && window.Telegram.WebApp.initDataUnsafe.user) {
+        telegramUser = window.Telegram.WebApp.initDataUnsafe.user;
+      }
     }
 
     const STATE = {
       currentPage: 1,
       totalPages: 80,
       stickersPerPage: 25,
-      totalStickers: 2000,
-      bcvRate: 0,
+      bcvRate: 36.5,
       userId: getOrCreateUserId(),
       userStickersCount: 0,
-      userBalanceBs: 0,
       selectedMilestone: 500,
       logoClicks: 0,
       clickTimer: null,
       backendUrl: localStorage.getItem('cfg_backend_url') || 'https://album-digital.onrender.com',
-      supabaseUrl: localStorage.getItem('cfg_sb_url') || '',
-      supabaseKey: localStorage.getItem('cfg_sb_key') || '',
+      supabaseUrl: localStorage.getItem('cfg_sb_url') || 'https://tu-proyecto.supabase.co',
+      supabaseKey: localStorage.getItem('cfg_sb_key') || 'tu-anon-key',
       supabase: null
     };
 
@@ -440,6 +352,9 @@
     });
 
     function getOrCreateUserId() {
+      if (telegramUser && telegramUser.id) {
+        return 'TG-' + telegramUser.id;
+      }
       let id = localStorage.getItem('album_user_id');
       if (!id) {
         id = 'USR-' + Math.floor(100000 + Math.random() * 900000);
@@ -462,12 +377,12 @@
       try {
         const res = await fetch(`${STATE.backendUrl}/api/bcv`);
         const data = await res.json();
-        STATE.bcvRate = data.promedio || 36.5;
-        document.getElementById('bcvRateDisplay').innerText = `Bs. ${STATE.bcvRate.toFixed(2)}`;
-        calculateTotal();
-      } catch (e) {
-        STATE.bcvRate = 36.5;
-      }
+        if (data.promedio) {
+          STATE.bcvRate = data.promedio;
+          document.getElementById('bcvRateDisplay').innerText = `Bs. ${STATE.bcvRate.toFixed(2)}`;
+          calculateTotal();
+        }
+      } catch (e) {}
     }
 
     async function syncUserWithBackend() {
@@ -476,7 +391,10 @@
         await fetch(`${STATE.backendUrl}/api/sincronizar-usuario`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ usuario_id: STATE.userId })
+          body: JSON.stringify({ 
+            usuario_id: STATE.userId,
+            nombre: telegramUser ? (telegramUser.first_name + ' ' + (telegramUser.last_name || '')) : 'Usuario Web'
+          })
         });
       } catch (e) {}
     }
@@ -535,10 +453,7 @@
         if (isMilestone) slot.onclick = () => openWithdrawModal(i);
 
         if (isUnlocked) {
-          const imgUrl = STATE.supabaseUrl 
-            ? `${STATE.supabaseUrl}/storage/v1/object/public/barajitas/${i}.jpg`
-            : `https://via.placeholder.com/150/581c87/ffffff?text=Cromo+${i}`;
-
+          const imgUrl = `${STATE.supabaseUrl}/storage/v1/object/public/barajitas/${i}.jpg`;
           slot.innerHTML = `<img src="${imgUrl}" class="w-full h-full object-cover rounded-lg"><span class="absolute bottom-1 right-1 bg-black/80 px-1.5 py-0.5 rounded text-[10px] font-bold text-purple-300">#${i}</span>`;
         } else {
           slot.innerHTML = `<i data-lucide="${isMilestone ? 'award' : 'lock'}" class="w-6 h-6 text-purple-500/40 mb-1"></i><span class="text-xs font-bold text-slate-500">#${i}</span>`;
@@ -583,10 +498,13 @@
       
       const btn = document.getElementById('btnSubmitPurchase');
       btn.disabled = true;
+      btn.innerText = 'PROCESANDO PAGO...';
 
       try {
+        // 1. Petición al Backend en Render
         const res = await fetch(`${STATE.backendUrl}/api/notificar-compra`, {
           method: 'POST',
+          mode: 'cors',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             usuario_id: STATE.userId,
@@ -597,15 +515,45 @@
           })
         });
 
-        if (res.ok) {
-          alert('¡Pago reportado con éxito y guardado en Supabase!');
+        const resData = await res.json();
+
+        // 2. Mecanismo Antifallos: Inserción directa en Supabase desde cliente si la BD del backend falló
+        if (STATE.supabase && (!resData.db_saved)) {
+          console.log("Activando inserción directa de respaldo en Supabase...");
+          await STATE.supabase.from('compras').insert({
+            usuario_id: String(STATE.userId),
+            barajitas_qty: qty,
+            monto_bs: totalBs,
+            monto_usd: totalUSD,
+            referencia: String(ref),
+            estado: 'pendiente'
+          });
+        }
+
+        alert('¡Pago reportado exitosamente! El administrador procesará tu solicitud.');
+        document.getElementById('refInput').value = '';
+        switchTab('album');
+
+      } catch (err) {
+        // Inserción de respaldo extrema si Render no responde
+        if (STATE.supabase) {
+          await STATE.supabase.from('compras').insert({
+            usuario_id: String(STATE.userId),
+            barajitas_qty: qty,
+            monto_bs: totalBs,
+            monto_usd: totalUSD,
+            referencia: String(ref),
+            estado: 'pendiente'
+          });
+          alert('Pago registrado en el servidor. Pendiente por aprobación.');
           document.getElementById('refInput').value = '';
           switchTab('album');
+        } else {
+          alert('Error conectando con los servicios. Intenta nuevamente.');
         }
-      } catch (err) {
-        alert('Error conectando con Render.');
       } finally {
         btn.disabled = false;
+        btn.innerText = 'REPORTAR PAGO Y SOLICITAR BARAJITAS';
       }
     }
 
@@ -628,6 +576,7 @@
       try {
         await fetch(`${STATE.backendUrl}/api/notificar-retiro`, {
           method: 'POST',
+          mode: 'cors',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             usuario_id: STATE.userId,
@@ -638,34 +587,23 @@
             datos_pago: `${bank} | ${phone} | ${id}`
           })
         });
-        alert('Solicitud enviada.');
+
+        if (STATE.supabase) {
+          await STATE.supabase.from('retiros_premios').insert({
+            usuario_id: String(STATE.userId),
+            milestone: STATE.selectedMilestone,
+            monto_bs: parseFloat(bsVal),
+            monto_usd: 200.00,
+            datos_pago: `${bank} | ${phone} | ${id}`,
+            estado: 'pendiente'
+          });
+        }
+
+        alert('Solicitud de retiro registrada con éxito.');
         closeWithdrawModal();
       } catch (e) {
-        alert('Error enviando solicitud.');
+        alert('Error registrando solicitud.');
       }
-    }
-
-    async function confirmTotalLiquidate() {
-      const bank = prompt("Banco:");
-      const phone = prompt("Teléfono:");
-      const id = prompt("Cédula:");
-      if (!bank || !phone || !id) return;
-
-      try {
-        await fetch(`${STATE.backendUrl}/api/notificar-retiro`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            usuario_id: STATE.userId,
-            tipo: 'liquidacion_total',
-            milestone: 0,
-            monto_bs: STATE.userBalanceBs,
-            monto_usd: (STATE.userBalanceBs / STATE.bcvRate).toFixed(2),
-            datos_pago: `${bank} | ${phone} | ${id}`
-          })
-        });
-        alert('Liquidación solicitada.');
-      } catch (e) {}
     }
 
     function openAdminPanel() {
@@ -681,26 +619,15 @@
 
     function switchAdminTab(tab) {
       document.getElementById('adminContentPagos').classList.add('hidden');
-      document.getElementById('adminContentretiros_premios').classList.add('hidden');
-      document.getElementById('adminContentImagenes').classList.add('hidden');
-      document.getElementById('adminContentMetricas').classList.add('hidden');
-      document.getElementById('adminContentUsuarios').classList.add('hidden');
+      document.getElementById('adminContentRetiros').classList.add('hidden');
       document.getElementById('adminContentConfig').classList.add('hidden');
 
       if (tab === 'pagos') {
         document.getElementById('adminContentPagos').classList.remove('hidden');
         loadPendingPayments();
-      } else if (tab === 'retiros_premiosAdmin') {
-        document.getElementById('adminContentretiros_premios').classList.remove('hidden');
+      } else if (tab === 'retirosAdmin') {
+        document.getElementById('adminContentRetiros').classList.remove('hidden');
         loadPendingWithdrawals();
-      } else if (tab === 'imagenesAdmin') {
-        document.getElementById('adminContentImagenes').classList.remove('hidden');
-      } else if (tab === 'metricas') {
-        document.getElementById('adminContentMetricas').classList.remove('hidden');
-        renderFinancialMetrics();
-      } else if (tab === 'usuarios') {
-        document.getElementById('adminContentUsuarios').classList.remove('hidden');
-        loadUserList();
       } else if (tab === 'config') {
         document.getElementById('adminContentConfig').classList.remove('hidden');
         document.getElementById('cfgBackendUrl').value = STATE.backendUrl;
@@ -709,50 +636,56 @@
       }
     }
 
-    // Lectura directa desde la tabla real: 'compras'
     async function loadPendingPayments() {
       const tbody = document.getElementById('pendingPaymentsTable');
-      tbody.innerHTML = '';
+      tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-slate-400">Consultando la tabla "compras"...</td></tr>';
       let pending = [];
 
       if (STATE.supabase) {
-        const { data } = await STATE.supabase.from('compras').select('*').eq('estado', 'pendiente');
-        pending = data || [];
+        const { data, error } = await STATE.supabase
+          .from('compras')
+          .select('*')
+          .eq('estado', 'pendiente');
+        if (!error && data) pending = data;
       }
 
+      tbody.innerHTML = '';
       if (pending.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-500">No hay pagos pendientes en la tabla 'compras'.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-500">No hay pagos pendientes registrados en la tabla 'compras'.</td></tr>`;
         return;
       }
 
       pending.forEach(tx => {
         const tr = document.createElement('tr');
-        tr.className = "border-b border-slate-800";
+        tr.className = "border-b border-slate-800 hover:bg-slate-900/50";
         tr.innerHTML = `
           <td class="p-3 text-xs">${new Date(tx.created_at || Date.now()).toLocaleString()}</td>
           <td class="p-3 font-mono text-purple-300">${tx.usuario_id}</td>
-          <td class="p-3 font-bold">${tx.barajitas_qty || 0}</td>
+          <td class="p-3 font-bold text-amber-300">${tx.barajitas_qty || 0}</td>
           <td class="p-3 text-emerald-400 font-bold">Bs. ${parseFloat(tx.monto_bs || 0).toFixed(2)}</td>
-          <td class="p-3 font-mono">${tx.referencia || '-'}</td>
+          <td class="p-3 font-mono text-white">${tx.referencia || '-'}</td>
           <td class="p-3 text-center">
-            <button onclick="approvePayment('${tx.id}')" class="px-3 py-1 bg-emerald-600 text-white rounded text-xs font-bold">Aprobar</button>
+            <button onclick="approvePayment('${tx.id}')" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs font-bold">Aprobar</button>
           </td>
         `;
         tbody.appendChild(tr);
       });
     }
 
-    // Lectura directa desde la tabla real: 'retiros_premios'
     async function loadPendingWithdrawals() {
       const tbody = document.getElementById('pendingWithdrawalsTable');
-      tbody.innerHTML = '';
+      tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-slate-400">Consultando "retiros_premios"...</td></tr>';
       let pending = [];
 
       if (STATE.supabase) {
-        const { data } = await STATE.supabase.from('retiros_premios').select('*').eq('estado', 'pendiente');
-        pending = data || [];
+        const { data, error } = await STATE.supabase
+          .from('retiros_premios')
+          .select('*')
+          .eq('estado', 'pendiente');
+        if (!error && data) pending = data;
       }
 
+      tbody.innerHTML = '';
       if (pending.length === 0) {
         tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-500">No hay solicitudes en la tabla 'retiros_premios'.</td></tr>`;
         return;
@@ -760,7 +693,7 @@
 
       pending.forEach(w => {
         const tr = document.createElement('tr');
-        tr.className = "border-b border-slate-800";
+        tr.className = "border-b border-slate-800 hover:bg-slate-900/50";
         tr.innerHTML = `
           <td class="p-3 text-xs">${new Date(w.created_at || Date.now()).toLocaleString()}</td>
           <td class="p-3 font-mono text-purple-300">${w.usuario_id}</td>
@@ -768,29 +701,8 @@
           <td class="p-3 text-emerald-400 font-bold">$${w.monto_usd || 0} USD</td>
           <td class="p-3 text-xs font-mono">${w.datos_pago || '-'}</td>
           <td class="p-3 text-center">
-            <button onclick="approveWithdrawal('${w.id}')" class="px-3 py-1 bg-emerald-600 text-white rounded text-xs font-bold">Aprobar</button>
+            <button onclick="approveWithdrawal('${w.id}')" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs font-bold">Aprobar</button>
           </td>
-        `;
-        tbody.appendChild(tr);
-      });
-    }
-
-    async function loadUserList() {
-      const tbody = document.getElementById('userListTable');
-      tbody.innerHTML = '';
-      let users = [];
-      if (STATE.supabase) {
-        const { data } = await STATE.supabase.from('usuarios').select('*');
-        users = data || [];
-      }
-      users.forEach(u => {
-        const tr = document.createElement('tr');
-        tr.className = "border-b border-slate-800";
-        tr.innerHTML = `
-          <td class="p-3 font-mono text-purple-300">${u.id}</td>
-          <td class="p-3 font-bold">${u.cantidad_barajitas || 0}</td>
-          <td class="p-3 text-emerald-400 font-bold">Bs. ${parseFloat(u.saldo_bs || 0).toFixed(2)}</td>
-          <td class="p-3 text-blue-400 font-bold">Bs. ${(parseFloat(u.saldo_bs || 0) * 0.7).toFixed(2)}</td>
         `;
         tbody.appendChild(tr);
       });
@@ -799,7 +711,7 @@
     async function approvePayment(id) {
       if (STATE.supabase) {
         await STATE.supabase.from('compras').update({ estado: 'aprobado' }).eq('id', id);
-        alert('Pago aprobado.');
+        alert('Pago aprobado con éxito.');
         loadPendingPayments();
       }
     }
@@ -807,34 +719,9 @@
     async function approveWithdrawal(id) {
       if (STATE.supabase) {
         await STATE.supabase.from('retiros_premios').update({ estado: 'aprobado' }).eq('id', id);
-        alert('Retiro aprobado.');
+        alert('Solicitud de retiro aprobada.');
         loadPendingWithdrawals();
       }
-    }
-
-    async function uploadStickerImagesBatch(e) {
-      e.preventDefault();
-      alert('Iniciando subida masiva a Supabase Storage...');
-    }
-
-    function renderFinancialMetrics() {
-      const ctx = document.getElementById('financialChart').getContext('2d');
-      if (window.myChart) window.myChart.destroy();
-      window.myChart = new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-          labels: ['Caja Neto (30%)', 'Usuarios (70%)'],
-          datasets: [{ data: [30, 70], backgroundColor: ['#a855f7', '#10b981'] }]
-        },
-        options: { responsive: true, maintainAspectRatio: false }
-      });
-    }
-
-    function filterUserLogs() {
-      const filter = document.getElementById('userSearchInput').value.toLowerCase();
-      document.querySelectorAll('#userListTable tr').forEach(row => {
-        row.style.display = row.innerText.toLowerCase().includes(filter) ? '' : 'none';
-      });
     }
 
     function saveAdminConfig(e) {
