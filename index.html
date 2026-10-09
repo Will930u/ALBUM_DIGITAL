@@ -4,18 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Álbum Digital Metalizado - 2000 Barajitas</title>
-  <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Chart.js CDN -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <!-- Supabase JS CDN -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
-  <!-- JSZip CDN para extracción de archivos comprimidos de hasta 2000 imágenes -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
   <style>
-    /* Estilos Metalizados Azul y Morado */
     body {
       background: radial-gradient(circle at center, #1a0b36 0%, #080314 100%);
       color: #e2e8f0;
@@ -56,22 +50,13 @@
     .glow-text {
       text-shadow: 0 0 10px rgba(168, 85, 247, 0.8), 0 0 20px rgba(59, 130, 246, 0.6);
     }
-    ::-webkit-scrollbar {
-      width: 8px;
-    }
-    ::-webkit-scrollbar-track {
-      background: #080314;
-    }
-    ::-webkit-scrollbar-thumb {
-      background: #581c87;
-      border-radius: 4px;
-    }
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: #080314; }
+    ::-webkit-scrollbar-thumb { background: #581c87; border-radius: 4px; }
   </style>
-  <!-- SDK Oficial de Telegram para Mini Apps -->
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body class="flex flex-col min-h-screen">
-  <!-- CABECERA PRINCIPAL / NAVEGACIÓN -->
   <header id="mainHeader" class="hidden sticky top-0 z-40 metal-card rounded-none border-t-0 border-x-0 px-6 py-4 flex flex-wrap justify-between items-center gap-4">
     <div class="flex items-center space-x-3 cursor-pointer select-none" id="appLogo">
       <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-500 to-purple-600 flex items-center justify-center font-bold text-xl shadow-lg border border-white/20">
@@ -83,21 +68,17 @@
       </div>
     </div>
     
-    <!-- Contenedor con Indicador de Valor Neto y BOTÓN DE RETIRO POR HITO -->
     <div class="flex items-center space-x-3">
-      <!-- Botón de Retiro Parcial por Hito -->
       <button id="btnHeaderMilestone" onclick="openWithdrawModal()" class="px-3.5 py-1.5 rounded-full bg-gradient-to-r from-amber-500 to-emerald-600 hover:from-amber-400 hover:to-emerald-500 text-white font-bold text-xs flex items-center space-x-1.5 shadow-lg border border-amber-300/40 transition transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed">
         <i data-lucide="award" class="w-4 h-4"></i>
         <span>Premio Hito ($200)</span>
       </button>
 
-      <!-- Indicador de Saldo en Bolívares y USD (Valor Neto) + Botón de Liquidación Total -->
       <div class="bg-slate-900/80 border border-purple-500/40 px-3 py-1.5 rounded-full flex items-center space-x-2">
         <i data-lucide="wallet" class="w-4 h-4 text-purple-400"></i>
         <span class="text-xs text-slate-400">Valor Neto:</span>
         <span id="userBalanceBs" class="font-bold text-emerald-400 text-sm">Bs. 0.00 ($0.00)</span>
         
-        <!-- Botón de Liquidación Total por Valor Neto -->
         <button id="btnHeaderTotalLiquidate" onclick="confirmTotalLiquidate()" title="Liquidar 100% del saldo y resetear álbum" class="ml-1 px-2 py-0.5 rounded-full bg-red-600/80 hover:bg-red-500 text-white font-extrabold text-[10px] uppercase border border-red-400/50 transition disabled:opacity-50 disabled:cursor-not-allowed">
           Liquidar Todo
         </button>
@@ -116,9 +97,7 @@
     </div>
   </header>
 
-  <!-- CONTENEDOR PRINCIPAL -->
   <main class="flex-grow flex items-center justify-center p-4">
-    <!-- 1. PANTALLA INTRO / LANDING -->
     <section id="introSection" class="text-center max-w-lg w-full p-8 metal-card flex flex-col items-center justify-center space-y-6">
       <div id="introLogo" class="w-28 h-28 rounded-full bg-gradient-to-tr from-blue-600 via-purple-600 to-indigo-800 flex items-center justify-center shadow-2xl border-2 border-white/30 cursor-pointer transition transform hover:scale-105 active:scale-95 select-none">
         <i data-lucide="trophy" class="w-14 h-14 text-white"></i>
@@ -133,7 +112,6 @@
       </button>
     </section>
 
-    <!-- 2. VISTA ÁLBUM DE BARAJITAS (5x5 - 80 Páginas) -->
     <section id="albumSection" class="hidden w-full max-w-6xl space-y-6">
       <div class="metal-card p-4 flex flex-col md:flex-row justify-between items-center gap-4">
         <div class="flex items-center space-x-4">
@@ -164,7 +142,6 @@
       <div id="stickersGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4"></div>
     </section>
 
-    <!-- 3. VISTA TIENDA (Pago Móvil y Compra) -->
     <section id="tiendaSection" class="hidden w-full max-w-2xl">
       <div class="metal-card p-6 md:p-8 space-y-6">
         <div class="border-b border-purple-500/30 pb-4 flex justify-between items-center">
@@ -218,7 +195,6 @@
       </div>
     </section>
 
-    <!-- 4. PANEL DE ADMINISTRACIÓN (Acceso Oculto) -->
     <section id="adminSection" class="hidden w-full max-w-5xl space-y-6">
       <div class="metal-card p-6 md:p-8 space-y-6">
         <div class="flex justify-between items-center border-b border-purple-500/30 pb-4">
@@ -228,7 +204,7 @@
             </div>
             <div>
               <h2 class="text-2xl font-bold glow-text">PANEL DE ADMINISTRACIÓN</h2>
-              <p class="text-xs text-purple-300">Gestión de pagos, caja dinámica (Bs. / USD) y expedientes.</p>
+              <p class="text-xs text-purple-300">Gestión de pagos y configuración del Backend.</p>
             </div>
           </div>
           <button onclick="exitAdmin()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold border border-slate-700 transition">
@@ -236,37 +212,19 @@
           </button>
         </div>
 
-        <!-- Pestañas del Panel Admin -->
         <div class="flex border-b border-slate-800 space-x-4 overflow-x-auto">
           <button onclick="switchAdminTab('pagos')" id="tabAdminPagos" class="pb-3 font-semibold text-sm border-b-2 border-purple-500 text-purple-300 flex items-center space-x-2 whitespace-nowrap">
             <i data-lucide="clock" class="w-4 h-4"></i>
             <span>Pagos Pendientes</span>
           </button>
-          <button onclick="switchAdminTab('retiros_premiosAdmin')" id="tabAdminretiros_premios" class="pb-3 font-semibold text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center space-x-2 whitespace-nowrap">
-            <i data-lucide="arrow-down-circle" class="w-4 h-4"></i>
-            <span>Solicitudes de Retiro</span>
-          </button>
-          <button onclick="switchAdminTab('imagenesAdmin')" id="tabAdminImagenes" class="pb-3 font-semibold text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center space-x-2 whitespace-nowrap">
-            <i data-lucide="image" class="w-4 h-4"></i>
-            <span>Gestión Masiva de Imágenes</span>
-          </button>
-          <button onclick="switchAdminTab('metricas')" id="tabAdminMetricas" class="pb-3 font-semibold text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center space-x-2 whitespace-nowrap">
-            <i data-lucide="bar-chart-3" class="w-4 h-4"></i>
-            <span>Métricas y Caja Dinámica</span>
-          </button>
-          <button onclick="switchAdminTab('usuarios')" id="tabAdminUsuarios" class="pb-3 font-semibold text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center space-x-2 whitespace-nowrap">
-            <i data-lucide="users" class="w-4 h-4"></i>
-            <span>Usuarios y Expedientes</span>
-          </button>
           <button onclick="switchAdminTab('config')" id="tabAdminConfig" class="pb-3 font-semibold text-sm border-b-2 border-transparent text-slate-400 hover:text-slate-200 flex items-center space-x-2 whitespace-nowrap">
             <i data-lucide="settings" class="w-4 h-4"></i>
-            <span>Configuración</span>
+            <span>Configuración API Render</span>
           </button>
         </div>
 
-        <!-- TAB 1: PAGOS PENDIENTES DE APROBACIÓN -->
         <div id="adminContentPagos" class="space-y-4">
-          <h3 class="text-sm font-bold text-purple-200">Aprobación Manual de Compras (Bimoneda)</h3>
+          <h3 class="text-sm font-bold text-purple-200">Aprobación Manual de Compras</h3>
           <div class="overflow-x-auto">
             <table class="w-full text-left text-sm text-slate-300">
               <thead class="bg-slate-900/80 text-xs uppercase text-purple-300 border-b border-purple-500/30">
@@ -284,177 +242,20 @@
           </div>
         </div>
 
-        <!-- TAB retiros_premios SOLICITADOS -->
-        <div id="adminContentretiros_premios" class="hidden space-y-4">
-          <h3 class="text-sm font-bold text-amber-300">Solicitudes de Retiro (Hito $200 vs Liquidación Total)</h3>
-          <div class="overflow-x-auto">
-            <table class="w-full text-left text-sm text-slate-300">
-              <thead class="bg-slate-900/80 text-xs uppercase text-amber-300 border-b border-purple-500/30">
-                <tr>
-                  <th class="p-3">Fecha</th>
-                  <th class="p-3">Usuario ID</th>
-                  <th class="p-3">Tipo / Hito</th>
-                  <th class="p-3">Monto (Bs. / USD)</th>
-                  <th class="p-3">Datos Pago Móvil</th>
-                  <th class="p-3 text-center">Acciones</th>
-                </tr>
-              </thead>
-              <tbody id="pendingWithdrawalsTable"></tbody>
-            </table>
-          </div>
-        </div>
-
-        <!-- TAB GESTIÓN Y SUBIDA MASIVA DE IMÁGENES -->
-        <div id="adminContentImagenes" class="hidden space-y-6">
-          <div class="bg-slate-950/60 p-5 rounded-xl border border-purple-500/30 space-y-4">
-            <div class="border-b border-purple-500/20 pb-3">
-              <h3 class="text-base font-bold text-purple-200 flex items-center space-x-2">
-                <i data-lucide="upload-cloud" class="w-5 h-5 text-purple-400"></i>
-                <span>Carga Masiva de Barajitas a Supabase Storage (Hasta 2000 Imágenes)</span>
-              </h3>
-              <p class="text-xs text-slate-400 mt-1">Sube múltiples imágenes (`1.jpg`, `2.jpg`, ..., `2000.jpg`) o un archivo `.zip` comprimido con todas las imágenes numeradas.</p>
-            </div>
-
-            <form onsubmit="uploadStickerImagesBatch(event)" class="space-y-4">
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label class="block text-xs font-semibold text-purple-200 mb-1">Seleccionar Imágenes o Archivo ZIP:</label>
-                  <input type="file" id="imgFileAssetBatch" accept="image/*,application/zip,application/x-zip-compressed" multiple required class="w-full bg-slate-900 border border-purple-500/40 rounded-lg p-2 text-xs text-slate-300 file:mr-2 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-500">
-                  <p class="text-[10px] text-purple-300/70 mt-1">* Los nombres de archivo deben ser el número de cromo (Ej: 1.jpg, 2.png, 1500.jpeg).</p>
-                </div>
-
-                <div class="flex items-end">
-                  <button type="submit" id="btnUploadImgBatch" class="metal-button w-full py-3 rounded-lg text-xs font-bold text-white flex items-center justify-center space-x-2">
-                    <i data-lucide="upload" class="w-4 h-4"></i>
-                    <span>Iniciar Carga Masiva a Supabase Storage</span>
-                  </button>
-                </div>
-              </div>
-            </form>
-
-            <div id="uploadProgressContainer" class="hidden space-y-2 pt-2">
-              <div class="flex justify-between text-xs font-bold">
-                <span id="uploadProgressLabel" class="text-purple-300">Procesando lote de imágenes...</span>
-                <span id="uploadProgressCounter" class="text-emerald-400">0 / 0 (0%)</span>
-              </div>
-              <div class="w-full bg-slate-900 rounded-full h-3 overflow-hidden border border-purple-500/30">
-                <div id="uploadProgressBar" class="bg-gradient-to-r from-emerald-500 to-purple-600 h-full w-0 transition-all duration-300"></div>
-              </div>
-            </div>
-
-            <div id="uploadStatusMessage" class="hidden p-3 rounded-lg text-xs font-bold"></div>
-          </div>
-        </div>
-
-        <!-- TAB 2: MÉTRICAS FINANCIERAS Y CAJA DINÁMICA DE LA PLATAFORMA -->
-        <div id="adminContentMetricas" class="hidden space-y-6">
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div class="bg-slate-950/60 p-4 rounded-xl border border-purple-500/20 text-center">
-              <span class="text-xs text-slate-400">Volumen Total Ventas (100%)</span>
-              <p id="metricTotalSales" class="text-xl font-bold text-blue-400 mt-1">Bs. 0.00 ($0.00)</p>
-            </div>
-            <div class="bg-slate-950/60 p-4 rounded-xl border border-purple-500/20 text-center">
-              <span class="text-xs text-slate-400">Caja Neto Plataforma (30% - retiros_premios)</span>
-              <p id="metricPlatformProfit" class="text-xl font-bold text-purple-400 mt-1">Bs. 0.00 ($0.00)</p>
-            </div>
-            <div class="bg-slate-950/60 p-4 rounded-xl border border-purple-500/20 text-center">
-              <span class="text-xs text-slate-400">Valor Neto en Usuarios (70%)</span>
-              <p id="metricUserNetValue" class="text-xl font-bold text-emerald-400 mt-1">Bs. 0.00 ($0.00)</p>
-            </div>
-          </div>
-
-          <div class="bg-purple-950/30 p-4 rounded-xl border border-purple-500/30 space-y-3">
-            <h4 class="text-xs font-bold text-purple-200 uppercase tracking-wider flex items-center space-x-2">
-              <i data-lucide="minus-circle" class="w-4 h-4 text-purple-400"></i>
-              <span>Registrar Retiro o Egreso de Caja (30% Ganancia)</span>
-            </h4>
-            <form onsubmit="registerPlatformWithdrawal(event)" class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <input type="number" step="0.01" id="withdrawalAmountBs" placeholder="Monto a restar en Bs." required class="bg-slate-900 border border-purple-500/40 rounded-lg p-2 text-xs text-white">
-              <input type="text" id="withdrawalConcept" placeholder="Concepto / Motivo del gasto" required class="bg-slate-900 border border-purple-500/40 rounded-lg p-2 text-xs text-white">
-              <button type="submit" class="bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-lg px-4 py-2 text-xs transition">
-                Restar de Caja
-              </button>
-            </form>
-          </div>
-
-          <div class="bg-slate-950/60 p-4 rounded-xl border border-purple-500/20 h-64">
-            <canvas id="financialChart"></canvas>
-          </div>
-        </div>
-
-        <!-- TAB 3: REGISTRO GENERAL Y EXPEDIENTE INDIVIDUAL DE USUARIOS -->
-        <div id="adminContentUsuarios" class="hidden space-y-4">
-          <div class="flex justify-between items-center gap-4">
-            <input type="text" id="userSearchInput" oninput="filterUserLogs()" placeholder="Buscar por ID de usuario..." class="w-full bg-slate-900 border border-purple-500/40 rounded-xl px-4 py-2 text-sm text-white focus:outline-none">
-          </div>
-          <div class="overflow-x-auto">
-            <table class="w-full text-left text-sm text-slate-300">
-              <thead class="bg-slate-900/80 text-xs uppercase text-purple-300 border-b border-purple-500/30">
-                <tr>
-                  <th class="p-3">Usuario ID</th>
-                  <th class="p-3">Barajitas Adquiridas</th>
-                  <th class="p-3">Total Invertido (Bs. / USD)</th>
-                  <th class="p-3">Saldo Neto 70% (Bs. / USD)</th>
-                  <th class="p-3 text-center">Acciones / Expediente</th>
-                </tr>
-              </thead>
-              <tbody id="userListTable"></tbody>
-            </table>
-          </div>
-          <div class="pt-4 border-t border-slate-800 flex justify-end">
-            <button onclick="purgeAllData()" class="px-4 py-2 bg-red-600/20 border border-red-500/40 hover:bg-red-600/40 text-red-300 rounded-xl text-xs font-bold transition flex items-center space-x-2">
-              <i data-lucide="trash-2" class="w-4 h-4"></i>
-              <span>PURGA TOTAL (REINICIAR SISTEMA)</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- TAB 4: CONFIGURACIÓN -->
         <div id="adminContentConfig" class="hidden space-y-4">
           <form onsubmit="saveAdminConfig(event)" class="space-y-4 text-sm">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label class="block text-xs font-semibold text-purple-200 mb-1">Supabase URL:</label>
-                <input type="text" id="cfgSupabaseUrl" class="w-full bg-slate-900 border border-purple-500/40 rounded-lg p-2 text-white text-xs font-mono">
-              </div>
-              <div>
-                <label class="block text-xs font-semibold text-purple-200 mb-1">Supabase Anon Key:</label>
-                <input type="text" id="cfgSupabaseKey" class="w-full bg-slate-900 border border-purple-500/40 rounded-lg p-2 text-white text-xs font-mono">
-              </div>
+            <div>
+              <label class="block text-xs font-semibold text-purple-200 mb-1">URL del Backend en Render:</label>
+              <input type="text" id="cfgBackendUrl" placeholder="Ej: https://tu-backend.onrender.com" class="w-full bg-slate-900 border border-purple-500/40 rounded-lg p-2.5 text-white text-xs font-mono">
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label class="block text-xs font-semibold text-purple-200 mb-1">Bot Token Telegram:</label>
-                <input type="text" id="cfgTelegramToken" class="w-full bg-slate-900 border border-purple-500/40 rounded-lg p-2 text-white text-xs font-mono">
-              </div>
-              <div>
-                <label class="block text-xs font-semibold text-purple-200 mb-1">Chat ID Telegram (Admin):</label>
-                <input type="text" id="cfgTelegramChatId" class="w-full bg-slate-900 border border-purple-500/40 rounded-lg p-2 text-white text-xs font-mono">
-              </div>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t border-slate-800">
-              <div>
-                <label class="block text-xs font-semibold text-purple-200 mb-1">Cédula Pago Móvil:</label>
-                <input type="text" id="cfgBankId" value="21101658" class="w-full bg-slate-900 border border-purple-500/40 rounded-lg p-2 text-white text-xs">
-              </div>
-              <div>
-                <label class="block text-xs font-semibold text-purple-200 mb-1">Teléfono Pago Móvil:</label>
-                <input type="text" id="cfgBankPhone" value="04129830982" class="w-full bg-slate-900 border border-purple-500/40 rounded-lg p-2 text-white text-xs">
-              </div>
-              <div>
-                <label class="block text-xs font-semibold text-purple-200 mb-1">Banco Código:</label>
-                <input type="text" id="cfgBankCode" value="0134" class="w-full bg-slate-900 border border-purple-500/40 rounded-lg p-2 text-white text-xs">
-              </div>
-            </div>
-            <button type="submit" class="metal-button px-6 py-2 rounded-xl text-xs font-bold text-white">
-              Guardar Configuración
+            <button type="submit" class="metal-button px-6 py-2.5 rounded-xl text-xs font-bold text-white">
+              Guardar URL de Render
             </button>
           </form>
         </div>
       </div>
     </section>
 
-    <!-- MODAL DE RETIRO DE PREMIOS HITOS ($200 CADA 500 BARAJITAS) -->
     <div id="withdrawModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
       <div class="metal-card max-w-lg w-full p-6 space-y-5 border border-amber-500/50">
         <div class="flex justify-between items-center border-b border-amber-500/30 pb-3">
@@ -480,9 +281,6 @@
               <span>Equivalente a Descontar (BCV):</span>
               <strong id="withdrawBs" class="text-emerald-400 font-bold">Bs. 0.00</strong>
             </div>
-            <div class="text-[10px] text-purple-300 pt-1 border-t border-slate-800">
-              *Tus barajitas se mantendrán intactas y el remanente continuará sumando para la siguiente meta.
-            </div>
           </div>
 
           <div class="space-y-2">
@@ -499,63 +297,14 @@
         </form>
       </div>
     </div>
-
-    <!-- MODAL DE EXPEDIENTE INDIVIDUAL DE USUARIO -->
-    <div id="userModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-      <div class="metal-card max-w-3xl w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
-        <div class="flex justify-between items-center border-b border-purple-500/30 pb-3">
-          <div>
-            <h3 class="text-xl font-bold text-purple-200" id="modalUserTitle">Expediente del Usuario: -</h3>
-            <p class="text-xs text-slate-400">Historial exclusivo y gráfica individualizada</p>
-          </div>
-          <button onclick="closeUserModal()" class="text-slate-400 hover:text-white text-lg font-bold">✕</button>
-        </div>
-        
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-          <div class="bg-slate-950/60 p-3 rounded-lg border border-purple-500/20">
-            <span class="text-slate-400">Total Barajitas:</span>
-            <strong id="modalUserStickers" class="block text-sm text-purple-300">0</strong>
-          </div>
-          <div class="bg-slate-950/60 p-3 rounded-lg border border-purple-500/20">
-            <span class="text-slate-400">Total Invertido (Bimoneda):</span>
-            <strong id="modalUserSpent" class="block text-sm text-emerald-400">Bs. 0.00 ($0.00)</strong>
-          </div>
-        </div>
-
-        <div class="bg-slate-950/60 p-3 rounded-xl border border-purple-500/20 h-48">
-          <canvas id="userIndividualChart"></canvas>
-        </div>
-
-        <div>
-          <h4 class="text-xs font-bold text-purple-300 uppercase mb-2">Transacciones e Historial</h4>
-          <div class="overflow-x-auto">
-            <table class="w-full text-left text-xs text-slate-300">
-              <thead class="bg-slate-900/80 text-purple-300 border-b border-purple-500/30">
-                <tr>
-                  <th class="p-2">Fecha</th>
-                  <th class="p-2">Barajitas</th>
-                  <th class="p-2">Monto (Bs. / USD)</th>
-                  <th class="p-2">Referencia</th>
-                  <th class="p-2">Estado</th>
-                </tr>
-              </thead>
-              <tbody id="modalUserHistoryTable"></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </div>
   </main>
 
   <script>
-    // Inicialización Segura Telegram Mini App
     if (window.Telegram && window.Telegram.WebApp) {
-      const tg = window.Telegram.WebApp;
-      tg.ready();
-      tg.expand();
+      window.Telegram.WebApp.ready();
+      window.Telegram.WebApp.expand();
     }
 
-    // Configuración de conexión al Backend
     const STATE = {
       currentPage: 1,
       totalPages: 80,
@@ -570,26 +319,14 @@
       isProcessingWithdrawal: false,
       logoClicks: 0,
       clickTimer: null,
-      supabase: null,
-      userChartInstance: null,
-      config: {
-        supabaseUrl: localStorage.getItem('cfg_sb_url') || '',
-        supabaseKey: localStorage.getItem('cfg_sb_key') || '',
-        telegramToken: localStorage.getItem('cfg_tg_token') || '',
-        telegramChatId: localStorage.getItem('cfg_tg_chat') || '',
-        bankId: localStorage.getItem('cfg_bank_id') || '21101658',
-        bankPhone: localStorage.getItem('cfg_bank_phone') || '04129830982',
-        bankCode: localStorage.getItem('cfg_bank_code') || '0134'
-      }
+      backendUrl: localStorage.getItem('cfg_backend_url') || ''
     };
 
     document.addEventListener('DOMContentLoaded', async () => {
       lucide.createIcons();
       setupLogoClickCounter();
-      updateBankDisplay();
       await fetchBcvRate();
-      initSupabase();
-      loadUserData();
+      await syncUserWithBackend();
     });
 
     function getOrCreateUserId() {
@@ -601,36 +338,30 @@
       return id;
     }
 
-    function updateBankDisplay() {
-      const bankDisplay = document.getElementById('bankDisplay');
-      const idDisplay = document.getElementById('idDisplay');
-      const phoneDisplay = document.getElementById('phoneDisplay');
-
-      if (bankDisplay) bankDisplay.innerText = STATE.config.bankCode;
-      if (idDisplay) idDisplay.innerText = STATE.config.bankId;
-      if (phoneDisplay) phoneDisplay.innerText = STATE.config.bankPhone;
-    }
-
-    function initSupabase() {
-      if (STATE.config.supabaseUrl && STATE.config.supabaseKey && window.supabase) {
-        try {
-          STATE.supabase = window.supabase.createClient(STATE.config.supabaseUrl, STATE.config.supabaseKey);
-        } catch (e) {
-          console.error('Error al inicializar Supabase:', e);
-        }
-      }
-    }
-
     async function fetchBcvRate() {
       try {
-        const res = await fetch('https://ve.dolarapi.com/v1/dolares/oficial');
+        const url = STATE.backendUrl ? `${STATE.backendUrl}/api/bcv` : 'https://ve.dolarapi.com/v1/dolares/oficial';
+        const res = await fetch(url);
         const data = await res.json();
-        STATE.bcvRate = data.promedio;
+        STATE.bcvRate = data.promedio || 36.5;
         document.getElementById('bcvRateDisplay').innerText = `Bs. ${STATE.bcvRate.toFixed(2)}`;
         calculateTotal();
       } catch (e) {
-        STATE.bcvRate = 36.5; // Fallback promedio
+        STATE.bcvRate = 36.5;
         document.getElementById('bcvRateDisplay').innerText = 'Bs. --.--';
+      }
+    }
+
+    async function syncUserWithBackend() {
+      if (!STATE.backendUrl) return;
+      try {
+        await fetch(`${STATE.backendUrl}/api/sincronizar-usuario`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ usuario_id: STATE.userId })
+        });
+      } catch (e) {
+        console.error('Error al sincronizar usuario:', e);
       }
     }
 
@@ -661,58 +392,13 @@
       document.getElementById('albumSection').classList.add('hidden');
       document.getElementById('tiendaSection').classList.add('hidden');
       document.getElementById('adminSection').classList.add('hidden');
-      document.getElementById('navAlbum').className = "px-4 py-2 rounded-lg text-sm font-semibold transition bg-slate-800 text-slate-300 hover:bg-purple-600/30 flex items-center space-x-2";
-      document.getElementById('navTienda').className = "px-4 py-2 rounded-lg text-sm font-semibold transition bg-slate-800 text-slate-300 hover:bg-purple-600/30 flex items-center space-x-2";
       
       if (tab === 'album') {
         document.getElementById('albumSection').classList.remove('hidden');
-        document.getElementById('navAlbum').className = "px-4 py-2 rounded-lg text-sm font-semibold transition bg-purple-600/30 text-purple-200 border border-purple-500/30 hover:bg-purple-600/50 flex items-center space-x-2";
         renderAlbumPage();
       } else if (tab === 'tienda') {
         document.getElementById('tiendaSection').classList.remove('hidden');
-        document.getElementById('navTienda').className = "px-4 py-2 rounded-lg text-sm font-semibold transition bg-purple-600/30 text-purple-200 border border-purple-500/30 hover:bg-purple-600/50 flex items-center space-x-2";
       }
-    }
-
-    async function loadUserData() {
-      STATE.userStickersCount = parseInt(localStorage.getItem(`stickers_${STATE.userId}`) || '0');
-      STATE.userBalanceBs = parseFloat(localStorage.getItem(`balance_${STATE.userId}`) || '0');
-      STATE.claimedMilestones = JSON.parse(localStorage.getItem(`claimed_milestones_${STATE.userId}`) || '[]');
-
-      let hasPending = false;
-      if (STATE.supabase) {
-        const { data } = await STATE.supabase.from('usuarios').select('*').eq('id', STATE.userId).single();
-        if (data) {
-          STATE.userStickersCount = data.cantidad_barajitas || 0;
-          STATE.userBalanceBs = data.saldo_bs || 0;
-          STATE.claimedMilestones = data.claimed_milestones || [];
-        }
-        const { data: pendingData } = await STATE.supabase.from('retiros_premios').select('id').eq('usuario_id', STATE.userId).eq('estado', 'pendiente');
-        if (pendingData && pendingData.length > 0) {
-          hasPending = true;
-        }
-      } else {
-        const localW = JSON.parse(localStorage.getItem('local_withdrawals') || '[]');
-        if (localW.some(w => w.usuario_id === STATE.userId && w.estado === 'pendiente')) {
-          hasPending = true;
-        }
-      }
-
-      STATE.isProcessingWithdrawal = hasPending;
-      updateUIHeader();
-    }
-
-    function updateUIHeader() {
-      const balanceUSD = STATE.bcvRate > 0 ? (STATE.userBalanceBs / STATE.bcvRate).toFixed(2) : '0.00';
-      document.getElementById('userBalanceBs').innerText = `Bs. ${STATE.userBalanceBs.toFixed(2)} ($${balanceUSD})`;
-      const progressPct = ((STATE.userStickersCount / STATE.totalStickers) * 100).toFixed(1);
-      document.getElementById('albumProgressText').innerText = `${STATE.userStickersCount} / ${STATE.totalStickers} (${progressPct}%)`;
-      document.getElementById('albumProgressBar').style.width = `${progressPct}%`;
-
-      const btnMilestone = document.getElementById('btnHeaderMilestone');
-      const btnLiquidate = document.getElementById('btnHeaderTotalLiquidate');
-      if (btnMilestone) btnMilestone.disabled = STATE.isProcessingWithdrawal;
-      if (btnLiquidate) btnLiquidate.disabled = STATE.isProcessingWithdrawal;
     }
 
     function renderAlbumPage() {
@@ -724,32 +410,25 @@
       for (let i = startIndex; i <= endIndex; i++) {
         const isUnlocked = i <= STATE.userStickersCount;
         const isMilestone = (i % 500 === 0);
-        const isClaimed = STATE.claimedMilestones.includes(i);
 
         const slot = document.createElement('div');
         let slotClass = `metal-slot aspect-[3/4] rounded-xl flex flex-col items-center justify-center p-2 relative overflow-hidden cursor-pointer ${isUnlocked ? 'filled' : ''}`;
         if (isMilestone) slotClass += ' milestone-slot';
         slot.className = slotClass;
 
-        if (isMilestone) {
-          slot.onclick = () => openWithdrawModal(i);
-        }
+        if (isMilestone) slot.onclick = () => openWithdrawModal(i);
 
         if (isUnlocked) {
-          const imgUrl = STATE.config.supabaseUrl 
-            ? `${STATE.config.supabaseUrl}/storage/v1/object/public/barajitas/${i}.jpg`
-            : `https://via.placeholder.com/150/581c87/ffffff?text=Cromo+${i}`;
-
           slot.innerHTML = `
-            <img src="${imgUrl}" alt="Barajita ${i}" class="w-full h-full object-cover rounded-lg" onerror="this.src='https://via.placeholder.com/150/1e1b4b/a855f7?text=${i}'">
+            <div class="w-full h-full flex items-center justify-center bg-purple-900/50 rounded-lg border border-purple-400">
+              <span class="font-extrabold text-xl text-purple-200">#${i}</span>
+            </div>
             <span class="absolute bottom-1 right-1 bg-black/80 px-1.5 py-0.5 rounded text-[10px] font-bold text-purple-300">#${i}</span>
-            ${isMilestone ? `<span class="absolute top-1 left-1 ${isClaimed ? 'bg-amber-600' : 'bg-emerald-600'} text-white text-[9px] font-extrabold px-1.5 py-0.5 rounded shadow">${isClaimed ? 'RETIRADO' : '¡PREMIO $200!'}</span>` : ''}
           `;
         } else {
           slot.innerHTML = `
             <i data-lucide="${isMilestone ? 'award' : 'lock'}" class="w-6 h-6 ${isMilestone ? 'text-amber-400' : 'text-purple-500/40'} mb-1"></i>
             <span class="text-xs font-bold ${isMilestone ? 'text-amber-300' : 'text-slate-500'}">#${i}</span>
-            ${isMilestone ? `<span class="text-[9px] text-amber-400/80 font-bold mt-1">Premio Hito $200</span>` : ''}
           `;
         }
         grid.appendChild(slot);
@@ -762,7 +441,6 @@
       if (newPage >= 1 && newPage <= STATE.totalPages) {
         STATE.currentPage = newPage;
         document.getElementById('currentPageNum').innerText = STATE.currentPage;
-        document.getElementById('pageInput').value = STATE.currentPage;
         renderAlbumPage();
       }
     }
@@ -786,119 +464,51 @@
 
     async function submitPurchase(e) {
       e.preventDefault();
+      if (!STATE.backendUrl) return alert('Debes configurar la URL de Render en el panel Admin.');
+
       const qty = parseInt(document.getElementById('stickerQty').value);
       const ref = document.getElementById('refInput').value;
-      const totalBs = (qty * 0.62) * STATE.bcvRate;
+      const totalUSD = qty * 0.62;
+      const totalBs = totalUSD * STATE.bcvRate;
+      
       const btn = document.getElementById('btnSubmitPurchase');
       btn.disabled = true;
       btn.innerText = 'PROCESANDO...';
-      
-      const purchaseData = {
-        usuario_id: STATE.userId,
-        barajitas_qty: qty,
-        monto_bs: totalBs,
-        referencia: ref,
-        estado: 'pendiente',
-        fecha: new Date().toISOString()
-      };
 
-      if (STATE.supabase) {
-        await STATE.supabase.from('transacciones').insert([purchaseData]);
-      } else {
-        const localTxs = JSON.parse(localStorage.getItem('local_txs') || '[]');
-        localTxs.push(purchaseData);
-        localStorage.setItem('local_txs', JSON.stringify(localTxs));
-      }
+      try {
+        const res = await fetch(`${STATE.backendUrl}/api/notificar-compra`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            usuario_id: STATE.userId,
+            barajitas_qty: qty,
+            monto_bs: totalBs,
+            monto_usd: totalUSD,
+            referencia: ref
+          })
+        });
 
-      if (STATE.config.telegramToken && STATE.config.telegramChatId) {
-        const usdVal = (totalBs / (STATE.bcvRate || 1)).toFixed(2);
-        const msg = `🛒 *NUEVA SOLICITUD DE COMPRA*\n\n` +
-                    `👤 *Usuario:* \`${STATE.userId}\`\n` +
-                    `📦 *Barajitas:* ${qty}\n` +
-                    `💵 *Monto:* Bs. ${totalBs.toFixed(2)} ($${usdVal})\n` +
-                    `📑 *Referencia:* \`${ref}\`\n` +
-                    `🕒 *Fecha:* ${new Date().toLocaleString()}`;
-        try {
-          await fetch(`https://api.telegram.org/bot${STATE.config.telegramToken}/sendMessage`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ chat_id: STATE.config.telegramChatId, text: msg, parse_mode: 'Markdown' })
-          });
-        } catch (e) {
-          console.error('Error Telegram:', e);
+        if (res.ok) {
+          alert('¡Pago reportado con éxito y registrado en Supabase!');
+          document.getElementById('refInput').value = '';
+          switchTab('album');
+        } else {
+          alert('Ocurrió un error al procesar el pago.');
         }
+      } catch (err) {
+        alert('Error de conexión con la API en Render.');
+      } finally {
+        btn.disabled = false;
+        btn.innerText = 'REPORTAR PAGO Y SOLICITAR BARAJITAS';
       }
-
-      alert('¡Pago reportado con éxito! Pendiente de verificación.');
-      document.getElementById('refInput').value = '';
-      btn.disabled = false;
-      btn.innerText = 'REPORTAR PAGO Y SOLICITAR BARAJITAS';
-      switchTab('album');
     }
 
-    function openWithdrawModal(specificMilestone = null) {
-      if (STATE.isProcessingWithdrawal) {
-        return alert('Tienes una solicitud de retiro en proceso. Espera la verificación.');
-      }
-      
-      // Asegurar que specificMilestone sea numérico y no un evento de JS al llamarlo desde onclick="openWithdrawModal()"
-      const targetMilestone = typeof specificMilestone === 'number' ? specificMilestone : null;
-
-      const container = document.getElementById('milestoneOptions');
-      container.innerHTML = '';
-
-      const milestones = [500, 1000, 1500, 2000];
-      let selectedOne = null;
-
-      milestones.forEach(m => {
-        const isUnlocked = STATE.userStickersCount >= m;
-        const isClaimed = STATE.claimedMilestones.includes(m);
-        const usdAmount = "200.00";
-
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = `p-3 rounded-xl border text-left flex flex-col justify-between transition ${
-          isClaimed 
-            ? 'bg-slate-900/60 border-slate-700 opacity-50 cursor-not-allowed' 
-            : isUnlocked 
-              ? 'bg-purple-950/40 border-amber-500 hover:bg-amber-500/20 text-white' 
-              : 'bg-slate-950/40 border-slate-800 opacity-60 cursor-not-allowed'
-        }`;
-
-        btn.innerHTML = `
-          <span class="font-bold text-amber-300">Hito Barajita #${m}</span> 
-          <span class="text-xs text-slate-300">$${usdAmount} USD (Fijo)</span>
-          <span class="text-[10px] mt-1 font-bold ${isClaimed ? 'text-slate-400' : isUnlocked ? 'text-emerald-400' : 'text-slate-500'}">
-            ${isClaimed ? '[ RETIRADO ]' : isUnlocked ? '¡DISPONIBLE!' : 'BLOQUEADO'}
-          </span>
-        `;
-
-        if (isUnlocked && !isClaimed) {
-          btn.onclick = () => selectMilestoneToWithdraw(m, usdAmount);
-          if (!selectedOne || targetMilestone === m) selectedOne = { milestone: m, usd: usdAmount };
-        }
-
-        container.appendChild(btn);
-      });
-
-      if (selectedOne) {
-        selectMilestoneToWithdraw(selectedOne.milestone, selectedOne.usd);
-      } else {
-        document.getElementById('withdrawUSD').innerText = '$200.00 USD';
-        document.getElementById('withdrawBs').innerText = `Bs. ${(200 * STATE.bcvRate).toFixed(2)}`;
-        document.getElementById('btnSendWithdraw').disabled = true;
-      }
-
-      document.getElementById('withdrawModal').classList.remove('hidden');
-      lucide.createIcons();
-    }
-
-    function selectMilestoneToWithdraw(m, usd) {
-      STATE.selectedMilestone = m;
-      const bsVal = (parseFloat(usd) * STATE.bcvRate).toFixed(2);
-      document.getElementById('withdrawUSD').innerText = `$${usd} USD`;
+    function openWithdrawModal(milestone = 500) {
+      STATE.selectedMilestone = milestone;
+      const bsVal = (200 * STATE.bcvRate).toFixed(2);
+      document.getElementById('withdrawUSD').innerText = '$200.00 USD';
       document.getElementById('withdrawBs').innerText = `Bs. ${bsVal}`;
-      document.getElementById('btnSendWithdraw').disabled = false;
+      document.getElementById('withdrawModal').classList.remove('hidden');
     }
 
     function closeWithdrawModal() {
@@ -907,96 +517,66 @@
 
     async function submitWithdrawalRequest(e) {
       e.preventDefault();
-      if (STATE.isProcessingWithdrawal) return alert('Ya existe una solicitud pendiente.');
-      if (!STATE.selectedMilestone) return alert('Selecciona un hito válido.');
-
-      const btnSubmit = document.getElementById('btnSendWithdraw');
-      btnSubmit.disabled = true;
-      STATE.isProcessingWithdrawal = true;
-      updateUIHeader();
+      if (!STATE.backendUrl) return alert('Configura la URL de Render en el panel Admin.');
 
       const bank = document.getElementById('wBank').value;
       const phone = document.getElementById('wPhone').value;
       const id = document.getElementById('wId').value;
-      const usdVal = "200.00";
       const bsVal = (200 * STATE.bcvRate).toFixed(2);
 
-      const withdrawalData = {
-        usuario_id: STATE.userId,
-        tipo: 'hito_parcial',
-        milestone: STATE.selectedMilestone,
-        monto_bs: bsVal,
-        monto_usd: usdVal,
-        datos_pago: `${bank} | ${phone} | ${id}`,
-        estado: 'pendiente',
-        fecha: new Date().toISOString()
-      };
+      const btn = document.getElementById('btnSendWithdraw');
+      btn.disabled = true;
 
-      if (STATE.supabase) {
-        await STATE.supabase.from('retiros_premios').insert([withdrawalData]);
-      } else {
-        const localW = JSON.parse(localStorage.getItem('local_withdrawals') || '[]');
-        localW.push(withdrawalData);
-        localStorage.setItem('local_withdrawals', JSON.stringify(localW));
-      }
+      try {
+        const res = await fetch(`${STATE.backendUrl}/api/notificar-retiro`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            usuario_id: STATE.userId,
+            tipo: 'hito_parcial',
+            milestone: STATE.selectedMilestone,
+            monto_bs: bsVal,
+            monto_usd: 200.00,
+            datos_pago: `${bank} | ${phone} | ${id}`
+          })
+        });
 
-      if (STATE.config.telegramToken && STATE.config.telegramChatId) {
-        const msg = `🏆 *SOLICITUD DE PREMIO HITO ($200)*\n\n` +
-                    `👤 *Usuario:* \`${STATE.userId}\`\n` +
-                    `🎯 *Hito:* Barajita #${STATE.selectedMilestone}\n` +
-                    `💵 *Premio:* $${usdVal} USD (Bs.${bsVal})\n` +
-                    `📱 *Pago Móvil:* ${bank} / ${phone} / ${id}`;
-        try {
-          await fetch(`https://api.telegram.org/bot${STATE.config.telegramToken}/sendMessage`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ chat_id: STATE.config.telegramChatId, text: msg, parse_mode: 'Markdown' })
-          });
-        } catch (err) {
-          console.error('Error Telegram:', err);
+        if (res.ok) {
+          alert(`Solicitud de retiro enviada a revisión.`);
+          closeWithdrawModal();
         }
+      } catch (err) {
+        alert('Error conectando con Render.');
+      } finally {
+        btn.disabled = false;
       }
-
-      alert(`Solicitud del hito #${STATE.selectedMilestone} por $200 enviada.`);
-      closeWithdrawModal();
     }
 
     async function confirmTotalLiquidate() {
-      if (STATE.isProcessingWithdrawal) return alert('Tienes una solicitud en revisión.');
-      if (STATE.userBalanceBs <= 0) return alert('No posees saldo para liquidar.');
-
-      const usdVal = STATE.bcvRate > 0 ? (STATE.userBalanceBs / STATE.bcvRate).toFixed(2) : '0.00';
-      if (!confirm(`⚠️ LIQUIDACIÓN TOTAL\n\nRetirarás Bs. ${STATE.userBalanceBs.toFixed(2)} ($${usdVal} USD).\nTu álbum volverá a 0.`)) return;
-
+      if (!STATE.backendUrl) return alert('Configura la URL de Render.');
+      
       const bank = prompt("Ingresa tu Banco:");
       const phone = prompt("Ingresa tu Teléfono:");
       const id = prompt("Ingresa tu Cédula/RIF:");
+      if (!bank || !phone || !id) return;
 
-      if (!bank || !phone || !id) return alert("Debes ingresar todos los datos.");
-
-      STATE.isProcessingWithdrawal = true;
-      updateUIHeader();
-
-      const withdrawalData = {
-        usuario_id: STATE.userId,
-        tipo: 'liquidacion_total',
-        milestone: 0,
-        monto_bs: STATE.userBalanceBs.toFixed(2),
-        monto_usd: usdVal,
-        datos_pago: `${bank} | ${phone} | ${id}`,
-        estado: 'pendiente',
-        fecha: new Date().toISOString()
-      };
-
-      if (STATE.supabase) {
-        await STATE.supabase.from('retiros_premios').insert([withdrawalData]);
-      } else {
-        const localW = JSON.parse(localStorage.getItem('local_withdrawals') || '[]');
-        localW.push(withdrawalData);
-        localStorage.setItem('local_withdrawals', JSON.stringify(localW));
+      try {
+        await fetch(`${STATE.backendUrl}/api/notificar-retiro`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            usuario_id: STATE.userId,
+            tipo: 'liquidacion_total',
+            milestone: 0,
+            monto_bs: STATE.userBalanceBs,
+            monto_usd: (STATE.userBalanceBs / STATE.bcvRate).toFixed(2),
+            datos_pago: `${bank} | ${phone} | ${id}`
+          })
+        });
+        alert('Solicitud de Liquidación Total enviada.');
+      } catch (e) {
+        alert('Error al procesar solicitud.');
       }
-
-      alert('Solicitud de Liquidación Total enviada a administración.');
     }
 
     function openAdminPanel() {
@@ -1005,474 +585,28 @@
       document.getElementById('tiendaSection').classList.add('hidden');
       document.getElementById('mainHeader').classList.remove('hidden');
       document.getElementById('adminSection').classList.remove('hidden');
-      loadPendingPayments();
     }
 
-    function exitAdmin() {
-      switchTab('album');
-    }
+    function exitAdmin() { switchTab('album'); }
 
     function switchAdminTab(tab) {
       document.getElementById('adminContentPagos').classList.add('hidden');
-      document.getElementById('adminContentretiros_premios').classList.add('hidden');
-      document.getElementById('adminContentImagenes').classList.add('hidden');
-      document.getElementById('adminContentMetricas').classList.add('hidden');
-      document.getElementById('adminContentUsuarios').classList.add('hidden');
       document.getElementById('adminContentConfig').classList.add('hidden');
 
       if (tab === 'pagos') {
         document.getElementById('adminContentPagos').classList.remove('hidden');
-        loadPendingPayments();
-      } else if (tab === 'retiros_premiosAdmin') {
-        document.getElementById('adminContentretiros_premios').classList.remove('hidden');
-        loadPendingWithdrawals();
-      } else if (tab === 'imagenesAdmin') {
-        document.getElementById('adminContentImagenes').classList.remove('hidden');
-      } else if (tab === 'metricas') {
-        document.getElementById('adminContentMetricas').classList.remove('hidden');
-        renderFinancialMetrics();
-      } else if (tab === 'usuarios') {
-        document.getElementById('adminContentUsuarios').classList.remove('hidden');
-        loadUserList();
       } else if (tab === 'config') {
         document.getElementById('adminContentConfig').classList.remove('hidden');
-        loadConfigForm();
+        document.getElementById('cfgBackendUrl').value = STATE.backendUrl;
       }
-    }
-
-    async function uploadStickerImagesBatch(e) {
-      e.preventDefault();
-      const fileInput = document.getElementById('imgFileAssetBatch');
-      const btn = document.getElementById('btnUploadImgBatch');
-      const statusMsg = document.getElementById('uploadStatusMessage');
-      const progressContainer = document.getElementById('uploadProgressContainer');
-      const progressBar = document.getElementById('uploadProgressBar');
-      const progressCounter = document.getElementById('uploadProgressCounter');
-      const progressLabel = document.getElementById('uploadProgressLabel');
-
-      if (!STATE.supabase) return alert('Configura Supabase en la pestaña Configuración.');
-      if (!fileInput.files || fileInput.files.length === 0) return alert('Selecciona archivos.');
-
-      btn.disabled = true;
-      statusMsg.classList.add('hidden');
-      progressContainer.classList.remove('hidden');
-
-      let filesToUpload = [];
-
-      try {
-        const firstFile = fileInput.files[0];
-        if (fileInput.files.length === 1 && (firstFile.type.includes('zip') || firstFile.name.endsWith('.zip'))) {
-          progressLabel.innerText = "Descomprimiendo ZIP...";
-          const zip = await JSZip.loadAsync(firstFile);
-          for (const filename of Object.keys(zip.files)) {
-            const entry = zip.files[filename];
-            if (!entry.dir && /\.(jpg|jpeg|png|webp)$/i.test(filename)) {
-              const numMatch = filename.split('/').pop().match(/^(\d+)\./);
-              if (numMatch) {
-                const num = parseInt(numMatch[1]);
-                if (num >= 1 && num <= 2000) {
-                  const blob = await entry.async('blob');
-                  filesToUpload.push({ name: `${num}.jpg`, blob });
-                }
-              }
-            }
-          }
-        } else {
-          for (let i = 0; i < fileInput.files.length; i++) {
-            const file = fileInput.files[i];
-            const numMatch = file.name.match(/^(\d+)\./);
-            if (numMatch) {
-              const num = parseInt(numMatch[1]);
-              if (num >= 1 && num <= 2000) filesToUpload.push({ name: `${num}.jpg`, blob: file });
-            }
-          }
-        }
-
-        let completed = 0, errors = 0;
-        const total = filesToUpload.length;
-        const queue = [...filesToUpload];
-
-        const worker = async () => {
-          while (queue.length > 0) {
-            const item = queue.shift();
-            try {
-              const { error } = await STATE.supabase.storage.from('barajitas').upload(item.name, item.blob, { upsert: true });
-              if (error) errors++;
-            } catch { errors++; }
-            completed++;
-            const pct = Math.round((completed / total) * 100);
-            progressBar.style.width = `${pct}%`;
-            progressCounter.innerText = `${completed} / ${total} (${pct}%)`;
-          }
-        };
-
-        await Promise.all(Array.from({ length: Math.min(5, queue.length) }, worker));
-        statusMsg.className = "p-3 rounded-lg text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 block";
-        statusMsg.innerText = `✔️ Carga Finalizada: ${completed - errors} de ${total} subidas.`;
-      } catch (err) {
-        statusMsg.className = "p-3 rounded-lg text-xs font-bold bg-red-500/20 text-red-300 border border-red-500/40 block";
-        statusMsg.innerText = `❌ Error: ${err.message}`;
-      } finally {
-        btn.disabled = false;
-      }
-    }
-
-    async function loadPendingPayments() {
-      const tbody = document.getElementById('pendingPaymentsTable');
-      tbody.innerHTML = '';
-      let pending = [];
-      if (STATE.supabase) {
-        const { data } = await STATE.supabase.from('transacciones').select('*').eq('estado', 'pendiente');
-        pending = data || [];
-      } else {
-        pending = JSON.parse(localStorage.getItem('local_txs') || '[]').filter(t => t.estado === 'pendiente');
-      }
-
-      if (pending.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-500">No hay pagos pendientes.</td></tr>`;
-        return;
-      }
-
-      pending.forEach(tx => {
-        const usdVal = STATE.bcvRate > 0 ? (parseFloat(tx.monto_bs) / STATE.bcvRate).toFixed(2) : '0.00';
-        const tr = document.createElement('tr');
-        tr.className = "border-b border-slate-800 hover:bg-slate-900/50";
-        tr.innerHTML = `
-          <td class="p-3 text-xs">${new Date(tx.fecha).toLocaleString()}</td>
-          <td class="p-3 font-mono text-purple-300">${tx.usuario_id}</td>
-          <td class="p-3 font-bold">${tx.barajitas_qty}</td>
-          <td class="p-3 text-emerald-400 font-bold">Bs. ${parseFloat(tx.monto_bs).toFixed(2)} ($${usdVal})</td>
-          <td class="p-3 font-mono">${tx.referencia}</td>
-          <td class="p-3 text-center space-x-2">
-            <button onclick="approvePayment('${tx.referencia}', '${tx.usuario_id}', ${tx.barajitas_qty}, ${tx.monto_bs})" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold">Aprobar</button>
-            <button onclick="rejectPayment('${tx.referencia}')" class="px-3 py-1 bg-red-600 hover:bg-red-500 text-white rounded-lg text-xs font-bold">Rechazar</button>
-          </td>
-        `;
-        tbody.appendChild(tr);
-      });
-    }
-
-    async function loadPendingWithdrawals() {
-      const tbody = document.getElementById('pendingWithdrawalsTable');
-      tbody.innerHTML = '';
-      let pending = [];
-      if (STATE.supabase) {
-        const { data } = await STATE.supabase.from('retiros_premios').select('*').eq('estado', 'pendiente');
-        pending = data || [];
-      } else {
-        pending = JSON.parse(localStorage.getItem('local_withdrawals') || '[]').filter(w => w.estado === 'pendiente');
-      }
-
-      if (pending.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-500">No hay retiros pendientes.</td></tr>`;
-        return;
-      }
-
-      pending.forEach(w => {
-        const isTotal = w.tipo === 'liquidacion_total';
-        const tr = document.createElement('tr');
-        tr.className = "border-b border-slate-800 hover:bg-slate-900/50";
-        tr.innerHTML = `
-          <td class="p-3 text-xs">${new Date(w.fecha).toLocaleString()}</td>
-          <td class="p-3 font-mono text-purple-300">${w.usuario_id}</td>
-          <td class="p-3 font-bold ${isTotal ? 'text-red-400' : 'text-amber-300'}">${isTotal ? 'LIQUIDACIÓN TOTAL' : `Hito #${w.milestone}`}</td>
-          <td class="p-3 text-emerald-400 font-bold">$${w.monto_usd} USD (Bs. ${w.monto_bs})</td>
-          <td class="p-3 text-xs font-mono">${w.datos_pago}</td>
-          <td class="p-3 text-center space-x-2">
-            <button onclick="approveWithdrawal('${w.usuario_id}', ${w.milestone}, ${w.monto_bs}, '${w.tipo || 'hito_parcial'}')" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold">Aprobar</button>
-          </td>
-        `;
-        tbody.appendChild(tr);
-      });
-    }
-
-    async function approveWithdrawal(userId, milestone, montoBs, tipo) {
-      const refPago = prompt("Número de referencia de Pago Móvil realizado:");
-      if (!refPago) return alert("Operación cancelada.");
-
-      if (tipo === 'liquidacion_total') {
-        if (STATE.supabase) {
-          await STATE.supabase.from('retiros_premios').update({ estado: 'aprobado', referencia_pago: refPago }).eq('usuario_id', userId).eq('tipo', 'liquidacion_total').eq('estado', 'pendiente');
-          await STATE.supabase.from('usuarios').update({ cantidad_barajitas: 0, saldo_bs: 0, claimed_milestones: [] }).eq('id', userId);
-        } else {
-          const localW = JSON.parse(localStorage.getItem('local_withdrawals') || '[]');
-          const target = localW.find(w => w.usuario_id === userId && w.tipo === 'liquidacion_total' && w.estado === 'pendiente');
-          if (target) { target.estado = 'aprobado'; target.referencia_pago = refPago; }
-          localStorage.setItem('local_withdrawals', JSON.stringify(localW));
-          localStorage.setItem(`stickers_${userId}`, '0');
-          localStorage.setItem(`balance_${userId}`, '0');
-          localStorage.setItem(`claimed_milestones_${userId}`, JSON.stringify([]));
-        }
-      } else {
-        if (STATE.supabase) {
-          await STATE.supabase.from('retiros_premios').update({ estado: 'aprobado', referencia_pago: refPago }).eq('usuario_id', userId).eq('milestone', milestone).eq('estado', 'pendiente');
-          const { data: user } = await STATE.supabase.from('usuarios').select('*').eq('id', userId).single();
-          const currentClaimed = user?.claimed_milestones || [];
-          if (!currentClaimed.includes(milestone)) currentClaimed.push(milestone);
-          const newBalance = Math.max(0, (user?.saldo_bs || 0) - parseFloat(montoBs));
-          await STATE.supabase.from('usuarios').update({ saldo_bs: newBalance, claimed_milestones: currentClaimed }).eq('id', userId);
-        } else {
-          const localW = JSON.parse(localStorage.getItem('local_withdrawals') || '[]');
-          const target = localW.find(w => w.usuario_id === userId && w.milestone === milestone && w.estado === 'pendiente');
-          if (target) { target.estado = 'aprobado'; target.referencia_pago = refPago; }
-          localStorage.setItem('local_withdrawals', JSON.stringify(localW));
-
-          const currentClaimed = JSON.parse(localStorage.getItem(`claimed_milestones_${userId}`) || '[]');
-          if (!currentClaimed.includes(milestone)) currentClaimed.push(milestone);
-          const currentBal = parseFloat(localStorage.getItem(`balance_${userId}`) || '0');
-          localStorage.setItem(`balance_${userId}`, Math.max(0, currentBal - parseFloat(montoBs)).toString());
-          localStorage.setItem(`claimed_milestones_${userId}`, JSON.stringify(currentClaimed));
-        }
-      }
-
-      alert("Retiro Aprobado y Procesado.");
-      loadUserData();
-      loadPendingWithdrawals();
-    }
-
-    async function approvePayment(ref, userId, qty, montoBs) {
-      const userNetShareBs = montoBs * 0.70;
-      if (STATE.supabase) {
-        await STATE.supabase.from('transacciones').update({ estado: 'aprobado' }).eq('referencia', ref);
-        const { data: user } = await STATE.supabase.from('usuarios').select('*').eq('id', userId).single();
-        await STATE.supabase.from('usuarios').upsert({
-          id: userId,
-          cantidad_barajitas: (user?.cantidad_barajitas || 0) + qty,
-          saldo_bs: (user?.saldo_bs || 0) + userNetShareBs
-        });
-      } else {
-        const localTxs = JSON.parse(localStorage.getItem('local_txs') || '[]');
-        const tx = localTxs.find(t => t.referencia === ref);
-        if (tx) tx.estado = 'aprobado';
-        localStorage.setItem('local_txs', JSON.stringify(localTxs));
-        const currentQty = parseInt(localStorage.getItem(`stickers_${userId}`) || '0');
-        const currentBalance = parseFloat(localStorage.getItem(`balance_${userId}`) || '0');
-        localStorage.setItem(`stickers_${userId}`, currentQty + qty);
-        localStorage.setItem(`balance_${userId}`, currentBalance + userNetShareBs);
-      }
-      alert(`Pago ${ref} aprobado.`);
-      loadUserData();
-      loadPendingPayments();
-    }
-
-    async function rejectPayment(ref) {
-      if (STATE.supabase) {
-        await STATE.supabase.from('transacciones').update({ estado: 'rechazado' }).eq('referencia', ref);
-      } else {
-        const localTxs = JSON.parse(localStorage.getItem('local_txs') || '[]');
-        const tx = localTxs.find(t => t.referencia === ref);
-        if (tx) tx.estado = 'rechazado';
-        localStorage.setItem('local_txs', JSON.stringify(localTxs));
-      }
-      loadPendingPayments();
-    }
-
-    async function renderFinancialMetrics() {
-      let approvedTxs = [];
-      if (STATE.supabase) {
-        const { data } = await STATE.supabase.from('transacciones').select('*').eq('estado', 'aprobado');
-        approvedTxs = data || [];
-      } else {
-        approvedTxs = JSON.parse(localStorage.getItem('local_txs') || '[]').filter(t => t.estado === 'aprobado');
-      }
-
-      const totalSales = approvedTxs.reduce((sum, t) => sum + parseFloat(t.monto_bs), 0);
-      const rawPlatformProfit = totalSales * 0.30;
-      const userNetValue = totalSales * 0.70;
-
-      const withdrawals = JSON.parse(localStorage.getItem('platform_withdrawals') || '[]');
-      const totalWithdrawals = withdrawals.reduce((sum, w) => sum + parseFloat(w.monto_bs), 0);
-      const currentPlatformProfit = rawPlatformProfit - totalWithdrawals;
-
-      const rate = STATE.bcvRate || 1;
-      document.getElementById('metricTotalSales').innerText = `Bs. ${totalSales.toFixed(2)} ($${(totalSales/rate).toFixed(2)})`;
-      document.getElementById('metricPlatformProfit').innerText = `Bs. ${currentPlatformProfit.toFixed(2)} ($${(currentPlatformProfit/rate).toFixed(2)})`;
-      document.getElementById('metricUserNetValue').innerText = `Bs. ${userNetValue.toFixed(2)} ($${(userNetValue/rate).toFixed(2)})`;
-
-      const ctx = document.getElementById('financialChart').getContext('2d');
-      if (window.myChart) window.myChart.destroy();
-      window.myChart = new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-          labels: ['Caja Neto Plataforma (30%)', 'Valor Neto Usuarios (70%)'],
-          datasets: [{
-            data: [Math.max(0, currentPlatformProfit), userNetValue],
-            backgroundColor: ['#a855f7', '#10b981'],
-            borderColor: '#0f172a',
-            borderWidth: 2
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { labels: { color: '#e2e8f0' } } }
-        }
-      });
-    }
-
-    function registerPlatformWithdrawal(e) {
-      e.preventDefault();
-      const amountBs = parseFloat(document.getElementById('withdrawalAmountBs').value);
-      const concept = document.getElementById('withdrawalConcept').value;
-      if (!amountBs || amountBs <= 0) return;
-
-      const withdrawals = JSON.parse(localStorage.getItem('platform_withdrawals') || '[]');
-      withdrawals.push({ monto_bs: amountBs, concepto: concept, fecha: new Date().toISOString() });
-      localStorage.setItem('platform_withdrawals', JSON.stringify(withdrawals));
-
-      document.getElementById('withdrawalAmountBs').value = '';
-      document.getElementById('withdrawalConcept').value = '';
-      alert('Egreso registrado.');
-      renderFinancialMetrics();
-    }
-
-    async function loadUserList() {
-      const tbody = document.getElementById('userListTable');
-      tbody.innerHTML = '';
-      let txs = [];
-      if (STATE.supabase) {
-        const { data } = await STATE.supabase.from('transacciones').select('*');
-        txs = data || [];
-      } else {
-        txs = JSON.parse(localStorage.getItem('local_txs') || '[]');
-      }
-
-      const usersMap = {};
-      txs.forEach(t => {
-        if (!usersMap[t.usuario_id]) {
-          usersMap[t.usuario_id] = { id: t.usuario_id, stickers: 0, totalSpentBs: 0 };
-        }
-        if (t.estado === 'aprobado') {
-          usersMap[t.usuario_id].stickers += t.barajitas_qty;
-          usersMap[t.usuario_id].totalSpentBs += parseFloat(t.monto_bs);
-        }
-      });
-
-      const rate = STATE.bcvRate || 1;
-      Object.values(usersMap).forEach(u => {
-        const net70Bs = u.totalSpentBs * 0.70;
-        const tr = document.createElement('tr');
-        tr.className = "border-b border-slate-800 hover:bg-slate-900/50";
-        tr.innerHTML = `
-          <td class="p-3 font-mono text-purple-300 font-bold">${u.id}</td>
-          <td class="p-3 font-bold">${u.stickers}</td>
-          <td class="p-3 text-emerald-400 font-bold">Bs. ${u.totalSpentBs.toFixed(2)} <span class="text-xs text-slate-400">($${(u.totalSpentBs/rate).toFixed(2)})</span></td>
-          <td class="p-3 text-blue-400 font-bold">Bs. ${net70Bs.toFixed(2)} <span class="text-xs text-slate-400">($${(net70Bs/rate).toFixed(2)})</span></td>
-          <td class="p-3 text-center">
-            <button onclick="openUserModal('${u.id}')" class="px-3 py-1 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-bold">Ver Expediente</button>
-          </td>
-        `;
-        tbody.appendChild(tr);
-      });
-    }
-
-    function filterUserLogs() {
-      const filter = document.getElementById('userSearchInput').value.toLowerCase();
-      const rows = document.querySelectorAll('#userListTable tr');
-      rows.forEach(row => {
-        row.style.display = row.innerText.toLowerCase().includes(filter) ? '' : 'none';
-      });
-    }
-
-    async function openUserModal(userId) {
-      document.getElementById('modalUserTitle').innerText = `Expediente del Usuario: ${userId}`;
-      let userTxs = [];
-      if (STATE.supabase) {
-        const { data } = await STATE.supabase.from('transacciones').select('*').eq('usuario_id', userId);
-        userTxs = data || [];
-      } else {
-        userTxs = JSON.parse(localStorage.getItem('local_txs') || '[]').filter(t => t.usuario_id === userId);
-      }
-
-      let totalStickers = 0;
-      let totalSpentBs = 0;
-      const historyTable = document.getElementById('modalUserHistoryTable');
-      historyTable.innerHTML = '';
-      const rate = STATE.bcvRate || 1;
-
-      userTxs.forEach(t => {
-        if (t.estado === 'aprobado') {
-          totalStickers += t.barajitas_qty;
-          totalSpentBs += parseFloat(t.monto_bs);
-        }
-        const usdVal = (parseFloat(t.monto_bs) / rate).toFixed(2);
-        const tr = document.createElement('tr');
-        tr.className = "border-b border-slate-800";
-        tr.innerHTML = `
-          <td class="p-2">${new Date(t.fecha).toLocaleDateString()}</td>
-          <td class="p-2 font-bold">${t.barajitas_qty}</td>
-          <td class="p-2 text-emerald-400">Bs. ${parseFloat(t.monto_bs).toFixed(2)} ($${usdVal})</td>
-          <td class="p-2 font-mono">${t.referencia}</td>
-          <td class="p-2"><span class="px-2 py-0.5 rounded text-[10px] uppercase font-bold ${t.estado === 'aprobado' ? 'bg-emerald-500/20 text-emerald-300' : 'bg-amber-500/20 text-amber-300'}">${t.estado}</span></td>
-        `;
-        historyTable.appendChild(tr);
-      });
-
-      document.getElementById('modalUserStickers').innerText = totalStickers;
-      document.getElementById('modalUserSpent').innerText = `Bs. ${totalSpentBs.toFixed(2)} ($${(totalSpentBs/rate).toFixed(2)})`;
-
-      const ctx = document.getElementById('userIndividualChart').getContext('2d');
-      if (STATE.userChartInstance) STATE.userChartInstance.destroy();
-      STATE.userChartInstance = new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels: userTxs.map((_, idx) => `Tx #${idx + 1}`),
-          datasets: [{
-            label: 'Barajitas Adquiridas',
-            data: userTxs.map(t => t.barajitas_qty),
-            borderColor: '#a855f7',
-            backgroundColor: 'rgba(168, 85, 247, 0.2)',
-            fill: true
-          }]
-        },
-        options: { responsive: true, maintainAspectRatio: false }
-      });
-
-      document.getElementById('userModal').classList.remove('hidden');
-    }
-
-    function closeUserModal() {
-      document.getElementById('userModal').classList.add('hidden');
-    }
-
-    function loadConfigForm() {
-      document.getElementById('cfgSupabaseUrl').value = STATE.config.supabaseUrl;
-      document.getElementById('cfgSupabaseKey').value = STATE.config.supabaseKey;
-      document.getElementById('cfgTelegramToken').value = STATE.config.telegramToken;
-      document.getElementById('cfgTelegramChatId').value = STATE.config.telegramChatId;
-      document.getElementById('cfgBankId').value = STATE.config.bankId;
-      document.getElementById('cfgBankPhone').value = STATE.config.bankPhone;
-      document.getElementById('cfgBankCode').value = STATE.config.bankCode;
     }
 
     function saveAdminConfig(e) {
       e.preventDefault();
-      STATE.config.supabaseUrl = document.getElementById('cfgSupabaseUrl').value.trim();
-      STATE.config.supabaseKey = document.getElementById('cfgSupabaseKey').value.trim();
-      STATE.config.telegramToken = document.getElementById('cfgTelegramToken').value.trim();
-      STATE.config.telegramChatId = document.getElementById('cfgTelegramChatId').value.trim();
-      STATE.config.bankId = document.getElementById('cfgBankId').value.trim();
-      STATE.config.bankPhone = document.getElementById('cfgBankPhone').value.trim();
-      STATE.config.bankCode = document.getElementById('cfgBankCode').value.trim();
-
-      localStorage.setItem('cfg_sb_url', STATE.config.supabaseUrl);
-      localStorage.setItem('cfg_sb_key', STATE.config.supabaseKey);
-      localStorage.setItem('cfg_tg_token', STATE.config.telegramToken);
-      localStorage.setItem('cfg_tg_chat', STATE.config.telegramChatId);
-      localStorage.setItem('cfg_bank_id', STATE.config.bankId);
-      localStorage.setItem('cfg_bank_phone', STATE.config.bankPhone);
-      localStorage.setItem('cfg_bank_code', STATE.config.bankCode);
-
-      updateBankDisplay();
-      initSupabase();
-      alert('Configuración guardada exitosamente.');
-    }
-
-    function purgeAllData() {
-      if (confirm('⚠️ ¿Estás seguro de REINICIAR Y PURGAR todos los datos locales?')) {
-        localStorage.clear();
-        location.reload();
-      }
+      STATE.backendUrl = document.getElementById('cfgBackendUrl').value.trim().replace(/\/$/, "");
+      localStorage.setItem('cfg_backend_url', STATE.backendUrl);
+      alert('URL de Render guardada exitosamente.');
+      syncUserWithBackend();
     }
   </script>
 </body>
