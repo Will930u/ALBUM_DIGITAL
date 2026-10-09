@@ -71,6 +71,7 @@ def sincronizar_usuario():
 
     if supabase_client:
         try:
+            # Upsert en la tabla real: usuarios
             res = supabase_client.table("usuarios").upsert({
                 "id": str(usuario_id),
                 "nombre": str(nombre)
@@ -95,15 +96,24 @@ def notificar_compra():
 
     if supabase_client:
         try:
-            # 1. Asegurar registro en usuarios
+            # 1. Registro o actualización en 'usuarios'
             supabase_client.table("usuarios").upsert({"id": str(usuario_id)}).execute()
             
-            # 2. Insertar en la tabla real de Supabase: compras_barajitas
-            supabase_client.table("compras_barajitas").insert({
+            # 2. Insertar en la tabla real: compras
+            supabase_client.table("compras").insert({
                 "usuario_id": str(usuario_id),
                 "barajitas_qty": int(barajitas_qty),
                 "monto_bs": float(monto_bs),
                 "monto_usd": float(monto_usd),
+                "referencia": str(referencia),
+                "estado": "pendiente"
+            }).execute()
+
+            # 3. Registrar en la tabla historial: transacciones
+            supabase_client.table("transacciones").insert({
+                "usuario_id": str(usuario_id),
+                "barajitas_qty": int(barajitas_qty),
+                "monto_bs": float(monto_bs),
                 "referencia": str(referencia),
                 "estado": "pendiente"
             }).execute()
@@ -136,10 +146,10 @@ def notificar_retiro():
 
     if supabase_client:
         try:
-            # Insertar en la tabla real de Supabase: pagos_pendientes
-            supabase_client.table("pagos_pendientes").insert({
+            # Seleccionar tabla según el tipo de solicitud (retiros_premios o retiros)
+            tabla_destino = "retiros_premios" if tipo == "hito_parcial" else "retiros"
+            supabase_client.table(tabla_destino).insert({
                 "usuario_id": str(usuario_id),
-                "tipo": str(tipo),
                 "milestone": int(milestone),
                 "monto_bs": float(monto_bs),
                 "monto_usd": float(monto_usd),
