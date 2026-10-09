@@ -9,7 +9,8 @@ CORS(app, resources={r"/*": {"origins": "*"}})
 
 # Variables de entorno en Render
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
+# Priorizamos la Service Role Key para poder gestionar usuarios en Supabase Auth
+SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("SUPABASE_KEY", "")
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_ADMIN_CHAT_ID = os.environ.get("TELEGRAM_ADMIN_CHAT_ID", "")
 
@@ -71,17 +72,26 @@ def register():
 
     if supabase_client:
         try:
-            # 1. Registrar en Supabase Auth (indispensable para enviar correos de recuperación)
+            # 1. Registrar en Supabase Auth (Módulo nativo de Autenticación)
             try:
+                # Intenta primero con API Admin (requiere service_role key)
                 supabase_client.auth.admin.create_user({
                     "email": gmail,
                     "password": password,
                     "email_confirm": True
                 })
-            except Exception as auth_err:
-                print(f"Aviso en Supabase Auth: {auth_err}")
+            except Exception as auth_admin_err:
+                print(f"Aviso en Admin Auth: {auth_admin_err}. Intentando registro público...")
+                try:
+                    # Alternativa de respaldo público
+                    supabase_client.auth.sign_up({
+                        "email": gmail,
+                        "password": password
+                    })
+                except Exception as auth_public_err:
+                    print(f"Aviso en SignUp Público: {auth_public_err}")
 
-            # 2. Registrar en tu tabla public.usuarios con tus columnas exactas
+            # 2. Registrar en tu tabla public.usuarios
             res = supabase_client.table("usuarios").insert({
                 "id": user_id,
                 "nombre": username,
@@ -149,7 +159,6 @@ def notificar_compra():
         except Exception as e:
             print(f"Error insertando transacción: {e}")
 
-    # Notificación con Botones Interactivos
     text = (
         f"🛒 <b>NUEVA SOLICITUD DE COMPRA</b>\n\n"
         f"👤 <b>Usuario ID:</b> <code>{usuario_id}</code>\n"
@@ -221,7 +230,6 @@ def notificar_retiro():
     sent = send_telegram_inline_keyboard(TELEGRAM_ADMIN_CHAT_ID, text, reply_markup)
     return jsonify({"status": "success", "telegram_sent": sent}), 200
 
-# WEBHOOK PARA PROCESAR LOS BOTOS PRESIONADOS EN TELEGRAM
 @app.route("/webhook/telegram", methods=["POST"])
 def webhook_telegram():
     data = request.get_json(silent=True) or {}
@@ -234,7 +242,6 @@ def webhook_telegram():
         chat_id = message["chat"]["id"]
         message_id = message["message_id"]
 
-        # Procesar Aprobación o Rechazo
         action_parts = callback_data.split(":")
         action = action_parts[0]
 
@@ -278,10 +285,8 @@ def webhook_telegram():
                 supabase_client.table("retiros_premios").update({"estado": "rechazado"}).eq("id", ret_id).execute()
             nuevo_texto = f"{message['text']}\n\n🔴 <b>RETIRO RECHAZADO</b>"
 
-        # Responder al callback para quitar el indicador de carga en Telegram
         requests.post(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/answerCallbackQuery", json={"callback_query_id": callback_id})
 
-        # Editar mensaje en Telegram retirando los botones
         requests.post(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/editMessageText", json={
             "chat_id": chat_id,
             "message_id": message_id,
