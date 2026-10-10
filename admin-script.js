@@ -119,8 +119,8 @@ async function loadAdminCompras() {
         </td>
         <td class="p-3 text-center space-x-1">
           ${tx.estado === 'pendiente' ? `
-            <button onclick="procesarEstadoCompra('${tx.id}', 'aprobado')" class="bg-emerald-600 text-white px-2 py-1 rounded text-[10px] font-bold">Aprobar</button>
-            <button onclick="procesarEstadoCompra('${tx.id}', 'rechazado')" class="bg-red-600 text-white px-2 py-1 rounded text-[10px] font-bold">Rechazar</button>
+            <button onclick="procesarEstadoCompra('${tx.referencia}', '${tx.usuario_id}', ${tx.barajitas_qty}, ${tx.monto_bs}, 'aprobado')" class="bg-emerald-600 text-white px-2 py-1 rounded text-[10px] font-bold">Aprobar</button>
+            <button onclick="procesarEstadoCompra('${tx.referencia}', '${tx.usuario_id}', 0, 0, 'rechazado')" class="bg-red-600 text-white px-2 py-1 rounded text-[10px] font-bold">Rechazar</button>
           ` : '<span class="text-slate-600">-</span>'}
         </td>
       </tr>
@@ -131,13 +131,32 @@ async function loadAdminCompras() {
   }
 }
 
-async function procesarEstadoCompra(txId, nuevoEstado) {
-  if (!supabaseClient) return;
+const API_URL = "https://album-digital.onrender.com";
+
+async function procesarEstadoCompra(referencia, usuarioId, barajitasQty, montoBs, nuevoEstado) {
   try {
-    await supabaseClient.from('transacciones').update({ estado: nuevoEstado }).eq('id', txId);
-    loadAdminCompras();
-  } catch (e) {
-    alert("Error actualizando estado.");
+    const res = await fetch(`${API_URL}/api/admin/procesar-compra`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        referencia: referencia,
+        usuario_id: usuarioId,
+        barajitas_qty: barajitasQty,
+        monto_bs: montoBs,
+        estado: nuevoEstado
+      })
+    });
+
+    const data = await res.json();
+    if (res.ok && data.status === "success") {
+      alert(`✅ Compra marcada como ${nuevoEstado.toUpperCase()} con éxito.`);
+      loadAdminCompras();
+    } else {
+      alert(`Error: ${data.message || 'No se pudo actualizar'}`);
+    }
+  } catch (err) {
+    console.error("Error al procesar la compra desde admin:", err);
+    alert("Ocurrió un error al conectar con el servidor.");
   }
 }
 
