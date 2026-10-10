@@ -230,34 +230,9 @@ async function marcarPremioPagado(id) {
   loadAdminPremios();
 }
 
-// 5. CARGA MASIVA DE BARAJITAS
-async function ejecutarCargaMasivaBarajitas() {
-  if (!supabaseClient) return alert("Cliente de Supabase no conectado.");
-  const rawText = document.getElementById('adminMasivoInput').value.trim();
-  if (!rawText) return alert("Ingresa datos válidos.");
-
-  const lines = rawText.split('\n');
-  const payload = lines.map(line => {
-    const parts = line.split('|');
-    return {
-      numero: parseInt(parts[0]),
-      nombre: parts[1],
-      imagen_url: parts[2]
-    };
-  }).filter(item => item.numero && item.nombre && item.imagen_url);
-
-  try {
-    const { error } = await supabaseClient.from('barajitas').upsert(payload);
-    if (error) throw error;
-    alert(`✅ ¡${payload.length} barajitas guardadas en Supabase!`);
-    document.getElementById('adminMasivoInput').value = '';
-  } catch (err) {
-    alert(`Error: ${err.message}`);
-  }
-}
 // 5. CARGA MASIVA DE BARAJITAS MEDIANTE ARCHIVOS JPG / PNG
 async function ejecutarCargaMasivaArchivos() {
-  if (!supabaseClient) return alert("Cliente de Supabase no conectado.");
+  if (!supabaseClient) return alert("Cliente de Supabase não conectado.");
   
   const fileInput = document.getElementById('adminFileImages');
   const statusText = document.getElementById('uploadStatusText');
@@ -272,30 +247,32 @@ async function ejecutarCargaMasivaArchivos() {
   statusText.innerText = `Subiendo 0 de ${files.length} barajitas...`;
 
   for (let i = 0; i < files.length; i++) {
-    const file = files.name;
-    // Extraer el número del nombre del archivo (Ej: "1.png" -> 1, "cromo_15.jpg" -> busca el número)
-    const matchNumber = file.match(/\d+/);
+    const file = files[i];
+    const fileNameStr = file.name; // <--- Corrección aquí: usar file.name en lugar de file
+    
+    // Extraer el número del nombre del archivo (Ej: "1.png" -> 1, "cromo_15.jpg" -> 15)
+    const matchNumber = fileNameStr.match(/\d+/);
     const numeroBarajita = matchNumber ? parseInt(matchNumber[0]) : (i + 1);
     
     statusText.innerText = `Procesando barajita #${numeroBarajita} (${i + 1} de ${files.length})...`;
 
     try {
       // 1. Subir la imagen al Storage de Supabase (Bucket 'barajitas')
-      const fileName = `barajita_${numeroBarajita}_${Date.now()}.${file.split('.').pop()}`;
+      const uniqueFileName = `barajita_${numeroBarajita}_${Date.now()}.${fileNameStr.split('.').pop()}`;
       
       const { data: uploadData, error: uploadError } = await supabaseClient.storage
         .from('barajitas')
-        .upload(fileName, file, { upsert: true });
+        .upload(uniqueFileName, file, { upsert: true });
 
       if (uploadError) {
-        console.error(`Error subiendo archivo ${file}:`, uploadError.message);
+        console.error(`Error subiendo archivo ${fileNameStr}:`, uploadError.message);
         continue;
       }
 
-      // 2. Obtener la URL pública de la imagen en Supabase
+      // 2. Obtener la URL pública de la imagen en Supabase Storage
       const { data: publicUrlData } = supabaseClient.storage
         .from('barajitas')
-        .getPublicUrl(fileName);
+        .getPublicUrl(uniqueFileName);
 
       const imageUrl = publicUrlData.publicUrl;
 
@@ -310,9 +287,11 @@ async function ejecutarCargaMasivaArchivos() {
 
       if (!dbError) {
         exitosas++;
+      } else {
+        console.error(`Error guardando en BD la barajita #${numeroBarajita}:`, dbError.message);
       }
     } catch (err) {
-      console.error(`Excepción con el archivo ${file}:`, err);
+      console.error(`Excepción con el archivo ${fileNameStr}:`, err);
     }
   }
 
