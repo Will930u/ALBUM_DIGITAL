@@ -23,7 +23,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   initSupabase();
   await fetchBcvRate();
   checkSession();
-  cargarDatosPagoMovilTienda(); // <--- CARGA LOS DATOS DEL ADMIN EN LA TIENDA
+  cargarDatosPagoMovilTienda();
 
   if (STATE.supabase) {
     STATE.supabase.auth.onAuthStateChange((event, session) => {
@@ -73,10 +73,12 @@ async function fetchBcvRate() {
     const res = await fetch(`${API_URL}/api/bcv`);
     const data = await res.json();
     STATE.bcvRate = data.promedio || 0;
-    document.getElementById('bcvRateDisplay').innerText = `Bs. ${STATE.bcvRate.toFixed(2)}`;
+    const bcvDisp = document.getElementById('bcvRateDisplay');
+    if (bcvDisp) bcvDisp.innerText = `Bs. ${STATE.bcvRate.toFixed(2)}`;
     calculateTotal();
   } catch (e) {
-    document.getElementById('bcvRateDisplay').innerText = 'Bs. --.--';
+    const bcvDisp = document.getElementById('bcvRateDisplay');
+    if (bcvDisp) bcvDisp.innerText = 'Bs. --.--';
   }
 }
 
@@ -246,18 +248,102 @@ function loadUserData() {
   STATE.userStickersCount = STATE.user.cantidad_barajitas || 0;
   STATE.userBalanceBs = STATE.user.saldo_bs || 0;
   updateUIHeader();
+  evaluarReglasHitosYLiquidar();
 }
 
 function updateUIHeader() {
   const balanceUSD = STATE.bcvRate > 0 ? (STATE.userBalanceBs / STATE.bcvRate).toFixed(2) : '0.00';
-  document.getElementById('userBalanceBs').innerText = `Bs. ${STATE.userBalanceBs.toFixed(2)} ($${balanceUSD})`;
+  const balElem = document.getElementById('userBalanceBs');
+  if (balElem) balElem.innerText = `Bs. ${STATE.userBalanceBs.toFixed(2)} ($${balanceUSD})`;
+  
   const progressPct = ((STATE.userStickersCount / STATE.totalStickers) * 100).toFixed(1);
-  document.getElementById('albumProgressText').innerText = `${STATE.userStickersCount} / ${STATE.totalStickers} (${progressPct}%)`;
-  document.getElementById('albumProgressBar').style.width = `${progressPct}%`;
+  const progText = document.getElementById('albumProgressText');
+  if (progText) progText.innerText = `${STATE.userStickersCount} / ${STATE.totalStickers} (${progressPct}%)`;
+  
+  const progBar = document.getElementById('albumProgressBar');
+  if (progBar) progBar.style.width = `${progressPct}%`;
+}
+
+// ----------------------------------------------------
+// MÁQUINA DE ESTADOS: HITOS, BLOQUEOS Y LIQUIDACIÓN
+// ----------------------------------------------------
+function evaluarReglasHitosYLiquidar() {
+  const count = STATE.userStickersCount;
+  const btnLiquidar = document.getElementById('btnHeaderTotalLiquidate');
+  const btnMilestone = document.getElementById('btnHeaderMilestone');
+
+  if (!btnLiquidar || !btnMilestone) return;
+
+  // Hitos exactos o superados: 500, 1000, 1500, 2000
+  const isHitoReached = (count >= 500 && count < 1000) || 
+                        (count >= 1000 && count < 1500) || 
+                        (count >= 1500 && count < 2000);
+
+  const isMaxComplete = count >= 2000;
+
+  if (isMaxComplete) {
+    // Al llegar a 2000: Desbloquear Liquidar Todo, Bloquear Premio Hito y advertir nuevo comienzo
+    btnLiquidar.disabled = false;
+    btnLiquidar.classList.remove('opacity-50', 'cursor-not-allowed');
+    btnMilestone.disabled = true;
+    btnMilestone.classList.add('opacity-50', 'cursor-not-allowed');
+    btnMilestone.title = "Álbum completo. Debe liquidar todo para un nuevo comienzo.";
+  } else if (isHitoReached) {
+    // Al alcanzar hitos intermedios (500, 1000, 1500) sin cobrar: Bloquear Liquidar Todo y Activar Premio Hito
+    btnLiquidar.disabled = true;
+    btnLiquidar.classList.add('opacity-50', 'cursor-not-allowed');
+    btnLiquidar.title = "Bloqueado: Debe decidir sobre su Premio Hito actual o continuar.";
+    
+    btnMilestone.disabled = false;
+    btnMilestone.classList.remove('opacity-50', 'cursor-not-allowed');
+  } else {
+    // Funcionamiento normal (por debajo de hitos o avanzando)
+    btnLiquidar.disabled = false;
+    btnLiquidar.classList.remove('opacity-50', 'cursor-not-allowed');
+    btnMilestone.disabled = false;
+    btnMilestone.classList.remove('opacity-50', 'cursor-not-allowed');
+  }
+}
+
+// CONFIRMACIÓN Y EJECUCIÓN DE LIQUIDAR TODO
+async function confirmTotalLiquidate() {
+  if (STATE.userStickersCount <= 0 && STATE.userBalanceBs <= 0) {
+    return alert("No tienes barajitas ni saldo neto para liquidar.");
+  }
+
+  const confirmacion = confirm("⚠️ ¿Estás seguro de liquidar todo? Se borrarán todas las barajitas de tu álbum y se procesará tu saldo neto acumulado.");
+  if (!confirmacion) return;
+
+  try {
+    if (STATE.supabase && STATE.user) {
+      // 1. Actualizar en Supabase reseteando barajitas y saldo
+      const { error } = await STATE.supabase
+        .table('usuarios')
+        .update({ cantidad_barajitas: 0, saldo_bs: 0.0 })
+        .eq('id', STATE.user.id);
+
+      if (error) throw error;
+
+      // 2. Actualizar estado local
+      STATE.user.cantidad_barajitas = 0;
+      STATE.user.saldo_bs = 0.0;
+      localStorage.setItem('album_user', JSON.stringify(STATE.user));
+
+      alert("🎉 ¡Felicitaciones por participar y completar tu ciclo! Tu álbum se ha liquidado con éxito y se reiniciará para un nuevo comienzo.");
+      
+      // Recargar datos y reiniciar vista del álbum
+      loadUserData();
+      renderAlbumPage();
+    }
+  } catch (err) {
+    console.error("Error al liquidar:", err);
+    alert("Ocurrió un error al procesar la liquidación en la base de datos.");
+  }
 }
 
 function renderAlbumPage() {
   const grid = document.getElementById('stickersGrid');
+  if (!grid) return;
   grid.innerHTML = '';
   const startIndex = (STATE.currentPage - 1) * STATE.stickersPerPage + 1;
   const endIndex = startIndex + STATE.stickersPerPage - 1;
@@ -289,22 +375,25 @@ function changePage(delta) {
   const newPage = STATE.currentPage + delta;
   if (newPage >= 1 && newPage <= STATE.totalPages) {
     STATE.currentPage = newPage;
-    document.getElementById('currentPageNum').innerText = STATE.currentPage;
+    const pageNumElem = document.getElementById('currentPageNum');
+    if (pageNumElem) pageNumElem.innerText = STATE.currentPage;
     renderAlbumPage();
   }
 }
 
 function calculateTotal() {
-  const qty = parseInt(document.getElementById('stickerQty').value) || 0;
+  const qtyInput = document.getElementById('stickerQty');
+  if (!qtyInput) return;
+  const qty = parseInt(qtyInput.value) || 0;
   const totalUSD = qty * 0.62;
   const totalBs = totalUSD * STATE.bcvRate;
-  document.getElementById('totalUSDDisplay').innerText = `$${totalUSD.toFixed(2)}`;
-  document.getElementById('totalBsDisplay').innerText = `Bs. ${totalBs.toFixed(2)}`;
+  
+  const usdDisp = document.getElementById('totalUSDDisplay');
+  const bsDisp = document.getElementById('totalBsDisplay');
+  if (usdDisp) usdDisp.innerText = `$${totalUSD.toFixed(2)}`;
+  if (bsDisp) bsDisp.innerText = `Bs. ${totalBs.toFixed(2)}`;
 }
 
-// ----------------------------------------------------
-// FUNCIÓN ACTUALIZADA CON BANCO, TELÉFONO Y REFERENCIA
-// ----------------------------------------------------
 async function submitPurchase(e) {
   e.preventDefault();
   const qty = parseInt(document.getElementById('stickerQty').value);
@@ -316,8 +405,10 @@ async function submitPurchase(e) {
   const totalUSD = qty * 0.62;
 
   const btn = document.getElementById('btnSubmitPurchase');
-  btn.disabled = true;
-  btn.innerText = 'PROCESANDO PAGO...';
+  if (btn) {
+    btn.disabled = true;
+    btn.innerText = 'PROCESANDO PAGO...';
+  }
 
   try {
     const res = await fetch(`${API_URL}/api/notificar-compra`, {
@@ -346,17 +437,21 @@ async function submitPurchase(e) {
   } catch (err) {
     alert('Error al conectar con el servidor');
   } finally {
-    btn.disabled = false;
-    btn.innerText = 'REPORTAR PAGO Y SOLICITAR BARAJITAS';
+    if (btn) {
+      btn.disabled = false;
+      btn.innerText = 'REPORTAR PAGO Y SOLICITAR BARAJITAS';
+    }
   }
 }
 
 function openWithdrawModal() {
-  document.getElementById('withdrawModal').classList.remove('hidden');
+  const modal = document.getElementById('withdrawModal');
+  if (modal) modal.classList.remove('hidden');
 }
 
 function closeWithdrawModal() {
-  document.getElementById('withdrawModal').classList.add('hidden');
+  const modal = document.getElementById('withdrawModal');
+  if (modal) modal.classList.add('hidden');
 }
 
 async function submitWithdrawalRequest(e) {
@@ -394,8 +489,10 @@ function setupLogoClickCounter() {
     STATE.logoClicks++;
     if (STATE.logoClicks >= 20) {
       STATE.logoClicks = 0;
-      document.getElementById('adminSection').classList.remove('hidden');
-      document.getElementById('albumSection').classList.add('hidden');
+      const adminSec = document.getElementById('adminSection');
+      const albumSec = document.getElementById('albumSection');
+      if (adminSec) adminSec.classList.remove('hidden');
+      if (albumSec) albumSec.classList.add('hidden');
     }
   });
 }
@@ -414,8 +511,10 @@ async function handleResetPassword(e) {
     return;
   }
 
-  btn.disabled = true;
-  btn.innerText = "GUARDANDO...";
+  if (btn) {
+    btn.disabled = true;
+    btn.innerText = "GUARDANDO...";
+  }
 
   try {
     const { data, error } = await STATE.supabase.auth.updateUser({
@@ -445,7 +544,9 @@ async function handleResetPassword(e) {
   } catch (err) {
     alert("Ocurrió un error inesperado al actualizar la contraseña.");
   } finally {
-    btn.disabled = false;
-    btn.innerText = "ACTUALIZAR CONTRASEÑA";
+    if (btn) {
+      btn.disabled = false;
+      btn.innerText = "ACTUALIZAR CONTRASEÑA";
+    }
   }
 }
