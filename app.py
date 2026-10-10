@@ -25,9 +25,9 @@ if SUPABASE_URL and SUPABASE_KEY:
         print(f"Error al inicializar Supabase: {e}")
 
 def send_telegram_inline_keyboard(chat_id: str, text: str, reply_markup: dict):
-    """Auxiliar para enviar mensajes a Telegram con botones interactivos."""
+    """Auxiliar para enviar mensajes a Telegram devolviendo el objeto JSON de respuesta."""
     if not TELEGRAM_BOT_TOKEN or not chat_id:
-        return False
+        return None
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     payload = {
         "chat_id": chat_id,
@@ -37,10 +37,10 @@ def send_telegram_inline_keyboard(chat_id: str, text: str, reply_markup: dict):
     }
     try:
         res = requests.post(url, json=payload, timeout=10)
-        return res.ok
+        return res.json() if res.ok else None
     except Exception as e:
         print(f"Error enviando notificación a Telegram: {e}")
-        return False
+        return None
 
 def procesar_aprobacion_compra(referencia, usuario_id, qty, monto_bs):
     """Lógica unificada y segura para abonar el 70% neto en saldo Bs y barajitas al usuario."""
@@ -183,22 +183,6 @@ def notificar_compra():
     if not all([usuario_id, barajitas_qty, monto_bs, referencia]):
         return jsonify({"status": "error", "message": "Campos incompletos"}), 400
 
-    tx_id = None
-    if supabase_client:
-        try:
-            res = supabase_client.table("transacciones").insert({
-                "usuario_id": str(usuario_id),
-                "barajitas_qty": int(barajitas_qty),
-                "monto_bs": float(monto_bs),
-                "monto_usd": float(monto_usd),
-                "referencia": str(referencia),
-                "estado": "pendiente"
-            }).execute()
-            if res.data:
-                tx_id = res.data[0]["id"]
-        except Exception as e:
-            print(f"Error insertando transacción: {e}")
-
     text = (
         f"🛒 <b>NUEVA SOLICITUD DE COMPRA</b>\n\n"
         f"👤 <b>Usuario ID:</b> <code>{usuario_id}</code>\n"
@@ -222,8 +206,33 @@ def notificar_compra():
         ]
     }
 
-    sent = send_telegram_inline_keyboard(TELEGRAM_ADMIN_CHAT_ID, text, reply_markup)
-    return jsonify({"status": "success", "telegram_sent": sent, "tx_id": tx_id}), 200
+    # Enviar a Telegram y obtener ID de mensaje
+    tg_response = send_telegram_inline_keyboard(TELEGRAM_ADMIN_CHAT_ID, text, reply_markup)
+    msg_id = None
+    if tg_response and tg_response.get("ok"):
+        msg_id = str(tg_response["result"]["message_id"])
+
+    tx_id = None
+    if supabase_client:
+        try:
+            res = supabase_client.table("transacciones").insert({
+                "usuario_id": str(usuario_id),
+                "barajitas_qty": int(barajitas_qty),
+                "monto_bs": float(monto_bs),
+                "monto_usd": float(monto_usd),
+                "referencia": str(referencia),
+                "banco_emisor": str(banco_emisor),
+                "telefono_emisor": str(telefono_emisor),
+                "estado": "pendiente",
+                "telegram_chat_id": str(TELEGRAM_ADMIN_CHAT_ID),
+                "telegram_message_id": msg_id
+            }).execute()
+            if res.data:
+                tx_id = res.data[0]["id"]
+        except Exception as e:
+            print(f"Error insertando transacción: {e}")
+
+    return jsonify({"status": "success", "telegram_sent": bool(msg_id), "tx_id": tx_id}), 200
 
 @app.route("/api/notificar-retiro", methods=["POST"])
 def notificar_retiro():
@@ -275,7 +284,7 @@ def notificar_retiro():
     }
 
     sent = send_telegram_inline_keyboard(TELEGRAM_ADMIN_CHAT_ID, text, reply_markup)
-    return jsonify({"status": "success", "telegram_sent": sent}), 200
+    return jsonify({"status": "success", "telegram_sent": bool(sent)}), 200
 
 @app.route("/webhook/telegram", methods=["POST"])
 def webhook_telegram():
@@ -380,19 +389,63 @@ def webhook_telegram():
 @app.route("/api/admin/procesar-compra", methods=["POST"])
 def admin_procesar_compra():
     data = request.get_json(silent=True) or {}
-    referencia = data.get("referencia")
+    referencia = str(data.get("referencia", "")).strip()
     usuario_id = data.get("usuario_id")
     barajitas_qty = data.get("barajitas_qty", 0)
     monto_bs = data.get("monto_bs", 0.0)
-    estado = data.get("estado")
+    estado = str(data.get("estado", "")).lower()
 
-    if not referencia or not estado:
-        return jsonify({"status": "error", "message": "Datos faltantes"}), 400
+    if not referencia or estado not in ["aprobado", "rechazado"]:
+        return jsonify({"status": "error", "message": "Datos faltantes o inválidos"}), 400
 
+    # 1. Obtener la transacción previa para rescatar message_id y chat_id de Telegram
+    tx_data = {}
+    if supabase_client:
+        try:
+            tx_res = supabase_client.table("transacciones").select("*").eq("referencia", referencia).execute()
+            if tx_res.data:
+                tx_data = tx_res.data[0]
+        except Exception as e:
+            print(f"Error consultando transacción: {e}")
+
+    chat_id = tx_data.get("telegram_chat_id") or TELEGRAM_ADMIN_CHAT_ID
+    msg_id = tx_data.get("telegram_message_id")
+
+    # 2. Procesar aprobación o rechazo en la BD
     if estado == "aprobado":
         ok = procesar_aprobacion_compra(referencia, usuario_id, barajitas_qty, monto_bs)
     else:
         ok = procesar_rechazo_compra(referencia)
+
+    # 3. Editar mensaje en Telegram para notificar la aprobación/rechazo efectuada desde el panel
+    if msg_id and chat_id:
+        estado_texto = "✅ <b>COMPRA APROBADA Y ABONADA DESDE EL PANEL ADMIN</b>" if estado == "aprobado" else "🔴 <b>COMPRA RECHAZADA DESDE EL PANEL ADMIN</b>"
+        
+        texto_actualizado = (
+            f"🛒 <b>SOLICITUD DE COMPRA PROCESADA</b>\n\n"
+            f"👤 <b>Usuario ID:</b> <code>{usuario_id}</code>\n"
+            f"🔢 <b>Referencia:</b> <code>{referencia}</code>\n"
+            f"📦 <b>Barajitas:</b> {barajitas_qty}\n"
+            f"💰 <b>Monto:</b> Bs. {float(monto_bs):.2f}\n\n"
+            f"{estado_texto}"
+        )
+
+        markup_sin_botones = {
+            "inline_keyboard": [
+                [{"text": "⚙️ ABRIR PANEL DE ADMINISTRACIÓN", "url": ADMIN_PANEL_URL}]
+            ]
+        }
+
+        try:
+            requests.post(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/editMessageText", json={
+                "chat_id": chat_id,
+                "message_id": int(msg_id),
+                "text": texto_actualizado,
+                "parse_mode": "HTML",
+                "reply_markup": markup_sin_botones
+            }, timeout=4)
+        except Exception as e:
+            print(f"Error actualizando Telegram desde Admin Web: {e}")
 
     if ok:
         return jsonify({"status": "success", "message": f"Compra {estado} correctamente"}), 200
