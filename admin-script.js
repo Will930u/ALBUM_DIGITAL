@@ -15,6 +15,8 @@ document.addEventListener('DOMContentLoaded', () => {
   try {
     if (window.supabase && typeof window.supabase.createClient === 'function') {
       supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      // Iniciar suscripción a cambios en tiempo real
+      suscribirCambiosTransacciones();
     }
   } catch (err) {
     console.error("Error al conectar con Supabase:", err);
@@ -22,6 +24,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
   loadAdminConfig();
 });
+
+// SUSCRIPCIÓN EN TIEMPO REAL A LA TABLA TRANSACCIONES
+function suscribirCambiosTransacciones() {
+  if (!supabaseClient) return;
+
+  supabaseClient
+    .channel('schema-db-changes')
+    .on(
+      'postgres_changes',
+      { event: 'UPDATE', schema: 'public', table: 'transacciones' },
+      (payload) => {
+        console.log('Cambio en tiempo real detectado:', payload);
+        const activeTab = document.querySelector('.admin-tab-btn.active');
+        if (activeTab && activeTab.id === 'tabBtn-compras') {
+          loadAdminCompras(); // Recarga automáticamente la tabla si estás en la pestaña de compras
+        }
+      }
+    )
+    .subscribe();
+}
 
 // NAVEGACIÓN ENTRE PESTAÑAS
 function switchTab(tabName) {
