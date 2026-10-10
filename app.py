@@ -9,7 +9,6 @@ CORS(app, resources={r"/*": {"origins": "*"}})
 
 # Variables de entorno en Render
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
-# Priorizamos la Service Role Key para poder gestionar usuarios en Supabase Auth
 SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("SUPABASE_KEY", "")
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_ADMIN_CHAT_ID = os.environ.get("TELEGRAM_ADMIN_CHAT_ID", "")
@@ -43,9 +42,43 @@ def send_telegram_inline_keyboard(chat_id: str, text: str, reply_markup: dict):
         print(f"Error enviando notificación a Telegram: {e}")
         return False
 
+def procesar_aprobacion_compra(referencia, usuario_id, qty, monto_bs):
+    """Lógica unificada para abonar barajitas y saldo al usuario."""
+    if not supabase_client:
+        return False
+    try:
+        user_net = float(monto_bs) * 0.70
+        # 1. Cambiar estado de la transacción
+        supabase_client.table("transacciones").update({"estado": "aprobado"}).eq("referencia", str(referencia)).execute()
+        
+        # 2. Consultar usuario y abonar saldo / barajitas
+        u_res = supabase_client.table("usuarios").select("*").eq("id", str(usuario_id)).execute()
+        if u_res.data:
+            curr_qty = u_res.data[0].get("cantidad_barajitas", 0) or 0
+            curr_bal = u_res.data[0].get("saldo_bs", 0.0) or 0.0
+            supabase_client.table("usuarios").update({
+                "cantidad_barajitas": int(curr_qty) + int(qty),
+                "saldo_bs": float(curr_bal) + user_net
+            }).eq("id", str(usuario_id)).execute()
+            return True
+    except Exception as e:
+        print(f"Error al procesar aprobación de compra: {e}")
+    return False
+
+def procesar_rechazo_compra(referencia):
+    """Lógica unificada para marcar compra como rechazada."""
+    if not supabase_client:
+        return False
+    try:
+        supabase_client.table("transacciones").update({"estado": "rechazado"}).eq("referencia", str(referencia)).execute()
+        return True
+    except Exception as e:
+        print(f"Error al procesar rechazo de compra: {e}")
+    return False
+
 @app.route("/", methods=["GET"])
 def index():
-    return jsonify({"status": "online", "service": "Backend Álbum Digital Botones Telegram & Admin Panel", "version": "2.6.0"}), 200
+    return jsonify({"status": "online", "service": "Backend Álbum Digital Botones Telegram & Admin Panel", "version": "2.7.0"}), 200
 
 @app.route("/api/bcv", methods=["GET"])
 def get_bcv_rate():
@@ -75,26 +108,15 @@ def register():
 
     if supabase_client:
         try:
-            # 1. Registrar en Supabase Auth (Módulo nativo de Autenticación)
             try:
-                # Intenta primero con API Admin (requiere service_role key)
                 supabase_client.auth.admin.create_user({
                     "email": gmail,
                     "password": password,
                     "email_confirm": True
                 })
             except Exception as auth_admin_err:
-                print(f"Aviso en Admin Auth: {auth_admin_err}. Intentando registro público...")
-                try:
-                    # Alternativa de respaldo público
-                    supabase_client.auth.sign_up({
-                        "email": gmail,
-                        "password": password
-                    })
-                except Exception as auth_public_err:
-                    print(f"Aviso en SignUp Público: {auth_public_err}")
+                print(f"Aviso en Admin Auth: {auth_admin_err}")
 
-            # 2. Registrar en tu tabla public.usuarios
             res = supabase_client.table("usuarios").insert({
                 "id": user_id,
                 "nombre": username,
@@ -162,7 +184,6 @@ def notificar_compra():
         except Exception as e:
             print(f"Error insertando transacción: {e}")
 
-    # Notificación con Botones Interactivos + Acceso al Panel Admin
     text = (
         f"🛒 <b>NUEVA SOLICITUD DE COMPRA</b>\n\n"
         f"👤 <b>Usuario ID:</b> <code>{usuario_id}</code>\n"
@@ -191,7 +212,6 @@ def notificar_compra():
 def notificar_retiro():
     data = request.get_json(silent=True) or {}
     usuario_id = data.get("usuario_id")
-    tipo = data.get("tipo", "hito_parcial")
     milestone = data.get("milestone", 0)
     monto_bs = data.get("monto_bs")
     monto_usd = data.get("monto_usd")
@@ -228,7 +248,7 @@ def notificar_retiro():
     reply_markup = {
         "inline_keyboard": [
             [
-                {"text": "🟢 CONFIRMAR PAGO REALIZADO", "callback_data": f"aprob_retiro:{retiro_id}:{usuario_id}:{monto_bs}"},
+                {"text": "🟢 CONFIRMAR PAGO REALIZADO", "callback_data": f"aprob_retiro:{retiro_id}"},
                 {"text": "🔴 RECHAZAR", "callback_data": f"rech_retiro:{retiro_id}"}
             ],
             [
@@ -244,7 +264,7 @@ def notificar_retiro():
 def webhook_telegram():
     data = request.get_json(silent=True) or {}
 
-    # Procesar comando /admin directo en el chat
+    # 1. Procesar comando /admin
     if "message" in data:
         msg = data["message"]
         text_received = msg.get("text", "")
@@ -266,7 +286,7 @@ def webhook_telegram():
             send_telegram_inline_keyboard(chat_id, admin_msg, admin_markup)
             return jsonify({"status": "ok"}), 200
 
-    # Procesar Callback Queries (Botones Aprobación / Rechazo)
+    # 2. Procesar Clics en Botones (Callback Queries)
     if "callback_query" in data:
         callback = data["callback_query"]
         callback_id = callback["id"]
@@ -278,7 +298,7 @@ def webhook_telegram():
         action_parts = callback_data.split(":")
         action = action_parts[0]
 
-        nuevo_texto = ""
+        nuevo_texto = message.get("text", "")
 
         if action == "aprob_compra":
             ref = action_parts[1]
@@ -286,50 +306,70 @@ def webhook_telegram():
             qty = int(action_parts[3])
             monto_bs = float(action_parts[4])
 
-            user_net = monto_bs * 0.70
-            if supabase_client:
-                supabase_client.table("transacciones").update({"estado": "aprobado"}).eq("referencia", ref).execute()
-                u_res = supabase_client.table("usuarios").select("*").eq("id", u_id).execute()
-                if u_res.data:
-                    curr_qty = u_res.data[0].get("cantidad_barajitas", 0)
-                    curr_bal = u_res.data[0].get("saldo_bs", 0)
-                    supabase_client.table("usuarios").update({
-                        "cantidad_barajitas": curr_qty + qty,
-                        "saldo_bs": curr_bal + user_net
-                    }).eq("id", u_id).execute()
-
-            nuevo_texto = f"{message['text']}\n\n✅ <b>COMPRA APROBADA POR EL ADMINISTRADOR</b>"
+            procesar_aprobacion_compra(ref, u_id, qty, monto_bs)
+            nuevo_texto += "\n\n✅ <b>COMPRA APROBADA Y SANGUINIZADA CON ÉXITO</b>"
 
         elif action == "rech_compra":
             ref = action_parts[1]
-            if supabase_client:
-                supabase_client.table("transacciones").update({"estado": "rechazado"}).eq("referencia", ref).execute()
-            nuevo_texto = f"{message['text']}\n\n🔴 <b>COMPRA RECHAZADA</b>"
+            procesar_rechazo_compra(ref)
+            nuevo_texto += "\n\n🔴 <b>COMPRA RECHAZADA</b>"
 
         elif action == "aprob_retiro":
             ret_id = action_parts[1]
             if supabase_client and ret_id:
                 supabase_client.table("retiros_premios").update({"estado": "aprobado"}).eq("id", ret_id).execute()
-            nuevo_texto = f"{message['text']}\n\n✅ <b>RETIRO MARCADO COMO PAGADO CON ÉXITO</b>"
+            nuevo_texto += "\n\n✅ <b>RETIRO MARCADO COMO PAGADO CON ÉXITO</b>"
 
         elif action == "rech_retiro":
             ret_id = action_parts[1]
             if supabase_client and ret_id:
                 supabase_client.table("retiros_premios").update({"estado": "rechazado"}).eq("id", ret_id).execute()
-            nuevo_texto = f"{message['text']}\n\n🔴 <b>RETIRO RECHAZADO</b>"
+            nuevo_texto += "\n\n🔴 <b>RETIRO RECHAZADO</b>"
 
+        # Notificar a Telegram que el botón fue presionado
         requests.post(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/answerCallbackQuery", json={"callback_query_id": callback_id})
+
+        # Editar el mensaje en Telegram actualizando el texto y dejando el botón de la web
+        nuevo_markup = {
+            "inline_keyboard": [
+                [
+                    {"text": "⚙️ ABRIR PANEL DE ADMINISTRACIÓN", "url": ADMIN_PANEL_URL}
+                ]
+            ]
+        }
 
         requests.post(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/editMessageText", json={
             "chat_id": chat_id,
             "message_id": message_id,
             "text": nuevo_texto,
-            "parse_mode": "HTML"
+            "parse_mode": "HTML",
+            "reply_markup": nuevo_markup
         })
 
     return jsonify({"status": "ok"}), 200
 
-# ENDPOINT PARA ACTUALIZAR CONTRASEÑA EN LA TABLA public.usuarios
+# Endpoint para procesar desde el Panel Web (admin-script.js) con la misma lógica
+@app.route("/api/admin/procesar-compra", methods=["POST"])
+def admin_procesar_compra():
+    data = request.get_json(silent=True) or {}
+    referencia = data.get("referencia")
+    usuario_id = data.get("usuario_id")
+    barajitas_qty = data.get("barajitas_qty", 0)
+    monto_bs = data.get("monto_bs", 0.0)
+    estado = data.get("estado")
+
+    if not referencia or not estado:
+        return jsonify({"status": "error", "message": "Datos faltantes"}), 400
+
+    if estado == "aprobado":
+        ok = procesar_aprobacion_compra(referencia, usuario_id, barajitas_qty, monto_bs)
+    else:
+        ok = procesar_rechazo_compra(referencia)
+
+    if ok:
+        return jsonify({"status": "success", "message": f"Compra {estado} correctamente"}), 200
+    return jsonify({"status": "error", "message": "Error al actualizar la base de datos"}), 500
+
 @app.route("/api/update-password", methods=["POST"])
 def update_password():
     data = request.get_json(silent=True) or {}
