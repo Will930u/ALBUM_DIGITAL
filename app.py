@@ -281,6 +281,7 @@ def notificar_retiro():
 def webhook_telegram():
     data = request.get_json(silent=True) or {}
 
+    # 1. Procesar comando /admin
     if "message" in data:
         msg = data["message"]
         text_received = msg.get("text", "")
@@ -290,7 +291,7 @@ def webhook_telegram():
             admin_msg = (
                 "🔐 <b>ACCESO AL PANEL ADMINISTRATIVO</b>\n\n"
                 "Presiona el botón de abajo para gestionar compras, retiros de premios, "
-                "datos de Pago Móvil, logo de la app y carga masiva de barajitas."
+                "datos de Pago Móvil, logo de la carga masiva de barajitas."
             )
             admin_markup = {
                 "inline_keyboard": [
@@ -302,6 +303,7 @@ def webhook_telegram():
             send_telegram_inline_keyboard(chat_id, admin_msg, admin_markup)
             return jsonify({"status": "ok"}), 200
 
+    # 2. Procesar Clics en Botones (Callback Queries) con respuesta inmediata para evitar Timeout
     if "callback_query" in data:
         callback = data["callback_query"]
         callback_id = callback["id"]
@@ -310,39 +312,51 @@ def webhook_telegram():
         chat_id = message["chat"]["id"]
         message_id = message["message_id"]
 
+        # Responder inmediatamente a Telegram para evitar BOT_RESPONSE_TIMEOUT
+        try:
+            requests.post(
+                f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/answerCallbackQuery", 
+                json={"callback_query_id": callback_id, "text": "Procesando solicitud..." },
+                timeout=3
+            )
+        except Exception as e:
+            print(f"Aviso answerCallbackQuery: {e}")
+
         action_parts = callback_data.split(":")
         action = action_parts[0]
-
         nuevo_texto = message.get("text", "")
 
-        if action == "aprob_compra":
+        if action == "aprob_compra" and len(action_parts) >= 5:
             ref = action_parts[1]
             u_id = action_parts[2]
             qty = int(action_parts[3])
             monto_bs = float(action_parts[4])
 
-            procesar_aprobacion_compra(ref, u_id, qty, monto_bs)
-            nuevo_texto += "\n\n✅ <b>COMPRA APROBADA Y ABONADA CON ÉXITO</b>"
+            # Ejecutar aprobación en Supabase de forma segura
+            ok = procesar_aprobacion_compra(ref, u_id, qty, monto_bs)
+            if ok:
+                nuevo_texto += "\n\n✅ <b>COMPRA APROBADA Y ABONADA DESDE TELEGRAM</b>"
+            else:
+                nuevo_texto += "\n\n⚠️ <b>COMPRA APROBADA (CON ADVERTENCIA EN BD)</b>"
 
-        elif action == "rech_compra":
+        elif action == "rech_compra" and len(action_parts) >= 2:
             ref = action_parts[1]
             procesar_rechazo_compra(ref)
             nuevo_texto += "\n\n🔴 <b>COMPRA RECHAZADA</b>"
 
-        elif action == "aprob_retiro":
+        elif action == "aprob_retiro" and len(action_parts) >= 2:
             ret_id = action_parts[1]
             if supabase_client and ret_id:
                 supabase_client.table("retiros_premios").update({"estado": "aprobado"}).eq("id", ret_id).execute()
             nuevo_texto += "\n\n✅ <b>RETIRO MARCADO COMO PAGADO CON ÉXITO</b>"
 
-        elif action == "rech_retiro":
+        elif action == "rech_retiro" and len(action_parts) >= 2:
             ret_id = action_parts[1]
             if supabase_client and ret_id:
                 supabase_client.table("retiros_premios").update({"estado": "rechazado"}).eq("id", ret_id).execute()
             nuevo_texto += "\n\n🔴 <b>RETIRO RECHAZADO</b>"
 
-        requests.post(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/answerCallbackQuery", json={"callback_query_id": callback_id})
-
+        # Actualizar el mensaje en Telegram removiendo los botones de acción y dejando solo el link al admin
         nuevo_markup = {
             "inline_keyboard": [
                 [
@@ -351,13 +365,16 @@ def webhook_telegram():
             ]
         }
 
-        requests.post(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/editMessageText", json={
-            "chat_id": chat_id,
-            "message_id": message_id,
-            "text": nuevo_texto,
-            "parse_mode": "HTML",
-            "reply_markup": nuevo_markup
-        })
+        try:
+            requests.post(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/editMessageText", json={
+                "chat_id": chat_id,
+                "message_id": message_id,
+                "text": nuevo_texto,
+                "parse_mode": "HTML",
+                "reply_markup": nuevo_markup
+            }, timeout=5)
+        except Exception as e:
+            print(f"Error editando mensaje en Telegram: {e}")
 
     return jsonify({"status": "ok"}), 200
 
