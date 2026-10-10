@@ -255,3 +255,68 @@ async function ejecutarCargaMasivaBarajitas() {
     alert(`Error: ${err.message}`);
   }
 }
+// 5. CARGA MASIVA DE BARAJITAS MEDIANTE ARCHIVOS JPG / PNG
+async function ejecutarCargaMasivaArchivos() {
+  if (!supabaseClient) return alert("Cliente de Supabase no conectado.");
+  
+  const fileInput = document.getElementById('adminFileImages');
+  const statusText = document.getElementById('uploadStatusText');
+  
+  if (!fileInput || fileInput.files.length === 0) {
+    return alert("⚠️ Por favor selecciona al menos una imagen JPG o PNG.");
+  }
+
+  const files = Array.from(fileInput.files);
+  let exitosas = 0;
+  
+  statusText.innerText = `Subiendo 0 de ${files.length} barajitas...`;
+
+  for (let i = 0; i < files.length; i++) {
+    const file = files.name;
+    // Extraer el número del nombre del archivo (Ej: "1.png" -> 1, "cromo_15.jpg" -> busca el número)
+    const matchNumber = file.match(/\d+/);
+    const numeroBarajita = matchNumber ? parseInt(matchNumber[0]) : (i + 1);
+    
+    statusText.innerText = `Procesando barajita #${numeroBarajita} (${i + 1} de ${files.length})...`;
+
+    try {
+      // 1. Subir la imagen al Storage de Supabase (Bucket 'barajitas')
+      const fileName = `barajita_${numeroBarajita}_${Date.now()}.${file.split('.').pop()}`;
+      
+      const { data: uploadData, error: uploadError } = await supabaseClient.storage
+        .from('barajitas')
+        .upload(fileName, file, { upsert: true });
+
+      if (uploadError) {
+        console.error(`Error subiendo archivo ${file}:`, uploadError.message);
+        continue;
+      }
+
+      // 2. Obtener la URL pública de la imagen en Supabase
+      const { data: publicUrlData } = supabaseClient.storage
+        .from('barajitas')
+        .getPublicUrl(fileName);
+
+      const imageUrl = publicUrlData.publicUrl;
+
+      // 3. Registrar o actualizar en la tabla 'barajitas' de Supabase
+      const { error: dbError } = await supabaseClient
+        .from('barajitas')
+        .upsert({
+          numero: numeroBarajita,
+          nombre: `Cromo Coleccionable #${numeroBarajita}`,
+          imagen_url: imageUrl
+        }, { onConflict: 'numero' });
+
+      if (!dbError) {
+        exitosas++;
+      }
+    } catch (err) {
+      console.error(`Excepción con el archivo ${file}:`, err);
+    }
+  }
+
+  statusText.innerText = `✅ ¡Carga masiva finalizada! Se registraron ${exitosas} de ${files.length} barajitas con éxito.`;
+  alert(`✅ Proceso completado. ${exitosas} barajitas guardadas correctamente.`);
+  fileInput.value = '';
+}
