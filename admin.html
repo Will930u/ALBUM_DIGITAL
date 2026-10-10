@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Panel de Administración | Álbum Digital</title>
+  <link id="faviconTag" rel="icon" href="https://via.placeholder.com/32">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 font-sans min-h-screen">
+
+  <div class="max-w-7xl mx-auto p-4 md:p-8 space-y-6">
+
+    <!-- HEADER DEL PANEL -->
+    <header class="flex flex-col md:flex-row justify-between items-center bg-slate-900 border border-purple-500/30 p-6 rounded-2xl shadow-xl gap-4">
+      <div class="flex items-center gap-3">
+        <div class="p-3 bg-purple-600/20 border border-purple-500/40 rounded-xl text-purple-400">
+          <i data-lucide="shield-check" class="w-8 h-8"></i>
+        </div>
+        <div>
+          <h1 class="text-2xl font-bold text-white tracking-wide">PANEL DE CONTROL ADMINISTRATIVO</h1>
+          <p class="text-xs text-slate-400">Plataforma Álbum Digital — Gestión Independiente</p>
+        </div>
+      </div>
+      <a href="index.html" class="bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/40 px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2">
+        <i data-lucide="log-out" class="w-4 h-4"></i> Volver a la Tienda
+      </a>
+    </header>
+
+    <!-- NAVEGACIÓN ENTRE PESTAÑAS -->
+    <nav class="flex flex-wrap gap-2 border-b border-slate-800 pb-3">
+      <button onclick="switchTab('config')" id="tabBtn-config" class="admin-tab-btn active bg-purple-600 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2">
+        <i data-lucide="settings" class="w-4 h-4"></i> Configuración, Logo & Pago Móvil
+      </button>
+      <button onclick="switchTab('compras')" id="tabBtn-compras" class="admin-tab-btn bg-slate-900 text-slate-400 hover:text-white px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2">
+        <i data-lucide="shopping-cart" class="w-4 h-4"></i> Compras / Verificación
+      </button>
+      <button onclick="switchTab('finanzas')" id="tabBtn-finanzas" class="admin-tab-btn bg-slate-900 text-slate-400 hover:text-white px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2">
+        <i data-lucide="bar-chart-3" class="w-4 h-4"></i> Estadísticas & Cuentas
+      </button>
+      <button onclick="switchTab('premios')" id="tabBtn-premios" class="admin-tab-btn bg-slate-900 text-slate-400 hover:text-white px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2">
+        <i data-lucide="gift" class="w-4 h-4"></i> Solicitudes de Premios
+      </button>
+      <button onclick="switchTab('barajitas')" id="tabBtn-barajitas" class="admin-tab-btn bg-slate-900 text-slate-400 hover:text-white px-4 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2">
+        <i data-lucide="upload-cloud" class="w-4 h-4"></i> Carga Masiva Barajitas
+      </button>
+    </nav>
+
+    <!-- 1. PESTAÑA: CONFIGURACIÓN GENERAL Y PAGO MÓVIL -->
+    <section id="tab-config" class="tab-content space-y-6">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- LOGO & FAVICON -->
+        <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
+          <h2 class="text-sm font-bold text-purple-400 uppercase tracking-wider flex items-center gap-2">
+            <i data-lucide="image" class="w-4 h-4"></i> Personalización de Logo y Favicon
+          </h2>
+          <div>
+            <label class="block text-xs text-slate-400 mb-1">URL de la Imagen (PNG o JPG)</label>
+            <input type="url" id="adminLogoUrlInput" placeholder="https://ejemplo.com/logo.png" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-purple-500">
+          </div>
+          <div class="p-4 bg-slate-950 border border-slate-800 rounded-xl flex items-center gap-4">
+            <img id="adminLogoPreview" src="https://via.placeholder.com/80?text=LOGO" class="w-16 h-16 object-cover rounded-xl border border-purple-500/30" alt="Preview">
+            <div class="text-xs text-slate-400">
+              <p class="font-bold text-white mb-0.5">Vista Previa Actual</p>
+              <p>Cambia la imagen global del sitio y la pestaña del navegador.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- DATOS DE PAGO MÓVIL -->
+        <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
+          <h2 class="text-sm font-bold text-amber-400 uppercase tracking-wider flex items-center gap-2">
+            <i data-lucide="landmark" class="w-4 h-4"></i> Datos de Pago Móvil (Visibles en Tienda)
+          </h2>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">Banco Receptor</label>
+              <input type="text" id="adminBancoInput" placeholder="Ej: Banesco (0134)" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-amber-500">
+            </div>
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">Cédula / RIF</label>
+              <input type="text" id="adminCedulaInput" placeholder="Ej: V-12345678" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-amber-500">
+            </div>
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">Teléfono</label>
+              <input type="text" id="adminTelefonoInput" placeholder="Ej: 04121234567" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-amber-500">
+            </div>
+            <div>
+              <label class="block text-xs text-slate-400 mb-1">Titular de Cuenta</label>
+              <input type="text" id="adminTitularInput" placeholder="Ej: Administrador Álbum" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-sm text-white focus:outline-none focus:border-amber-500">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <button onclick="saveAdminConfig()" class="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-purple-900/40 transition">
+        GUARDAR CONFIGURACIÓN Y PAGO MÓVIL
+      </button>
+    </section>
+
+    <!-- 2. PESTAÑA: COMPRAS Y VERIFICACIÓN -->
+    <section id="tab-compras" class="tab-content hidden space-y-4">
+      <div class="flex justify-between items-center">
+        <h2 class="text-sm font-bold text-purple-300 uppercase tracking-wider">Historial de Compras Notificadas</h2>
+        <button onclick="loadAdminCompras()" class="bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs px-3 py-1.5 rounded-lg text-slate-300">
+          Refrescar Lista
+        </button>
+      </div>
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs text-slate-300">
+            <thead class="bg-slate-950 text-slate-400 uppercase border-b border-slate-800 font-bold">
+              <tr>
+                <th class="p-3">Usuario ID</th>
+                <th class="p-3">Referencia</th>
+                <th class="p-3">Barajitas</th>
+                <th class="p-3">Monto (Bs / USD)</th>
+                <th class="p-3">Estado</th>
+                <th class="p-3 text-center">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="adminComprasTableBody" class="divide-y divide-slate-800">
+              <!-- Carga Dinámica -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. PESTAÑA: ESTADÍSTICAS FINANCIERAS -->
+    <section id="tab-finanzas" class="tab-content hidden space-y-6">
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl space-y-1">
+          <p class="text-xs text-slate-400 font-semibold uppercase">Total Recaudado (Ventas Aprobadas)</p>
+          <p id="statTotalVentas" class="text-2xl font-extrabold text-white">Bs. 0.00</p>
+        </div>
+        <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl space-y-1">
+          <p class="text-xs text-slate-400 font-semibold uppercase">Fondo de Premios (70%)</p>
+          <p id="statFondoPremios" class="text-2xl font-extrabold text-indigo-400">Bs. 0.00</p>
+        </div>
+        <div class="bg-slate-900 border border-slate-800 p-5 rounded-2xl space-y-1">
+          <p class="text-xs text-slate-400 font-semibold uppercase">Ganancia Plataforma (30%)</p>
+          <p id="statGananciaPlataforma" class="text-2xl font-extrabold text-emerald-400">Bs. 0.00</p>
+        </div>
+      </div>
+
+      <!-- CONTROL DE BANCO & DEDUCCIONES -->
+      <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
+        <h2 class="text-sm font-bold text-amber-400 uppercase tracking-wider flex items-center gap-2">
+          <i data-lucide="calculator" class="w-4 h-4"></i> Control de Caja Bancaria & Gastos
+        </h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+          <div>
+            <label class="block text-xs text-slate-400 mb-1">Deducción / Gasto Bancario (Bs.)</label>
+            <input type="number" step="0.01" id="adminDeduccionInput" placeholder="0.00" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-amber-500">
+          </div>
+          <div>
+            <label class="block text-xs text-slate-400 mb-1">Concepto o Nota</label>
+            <input type="text" id="adminDeduccionNota" placeholder="Ej: Retiro personal" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-amber-500">
+          </div>
+          <button onclick="aplicarDeduccionBancaria()" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-3 rounded-xl transition">
+            DEDUCIR Y CALCULAR
+          </button>
+        </div>
+
+        <div class="p-4 bg-slate-950 border border-amber-500/20 rounded-xl flex justify-between items-center text-xs">
+          <span class="text-slate-400">Saldo estimado disponible en Banco (Total - Deducciones):</span>
+          <span id="statSaldoBancoReal" class="text-base font-extrabold text-amber-400">Bs. 0.00</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. PESTAÑA: SOLICITUD DE PREMIOS -->
+    <section id="tab-premios" class="tab-content hidden space-y-4">
+      <div class="flex justify-between items-center">
+        <h2 class="text-sm font-bold text-amber-300 uppercase tracking-wider">Solicitudes de Reclamo de Premios</h2>
+        <button onclick="loadAdminPremios()" class="bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs px-3 py-1.5 rounded-lg text-slate-300">
+          Refrescar Lista
+        </button>
+      </div>
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs text-slate-300">
+            <thead class="bg-slate-950 text-slate-400 uppercase border-b border-slate-800 font-bold">
+              <tr>
+                <th class="p-3">ID Retiro</th>
+                <th class="p-3">Usuario</th>
+                <th class="p-3">Hito Reclamado</th>
+                <th class="p-3">Monto Premio</th>
+                <th class="p-3">Pago Móvil Destino</th>
+                <th class="p-3">Estado</th>
+                <th class="p-3 text-center">Acción</th>
+              </tr>
+            </thead>
+            <tbody id="adminPremiosTableBody" class="divide-y divide-slate-800">
+              <!-- Carga Dinámica -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5. PESTAÑA: CARGA MASIVA DE BARAJITAS -->
+    <section id="tab-barajitas" class="tab-content hidden space-y-4">
+      <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
+        <h2 class="text-sm font-bold text-purple-300 uppercase tracking-wider flex items-center gap-2">
+          <i data-lucide="layers" class="w-4 h-4"></i> Carga Masiva de Barajitas a Supabase
+        </h2>
+        <p class="text-xs text-slate-400">Formato por línea: <code>Numero|Nombre|URL_Imagen</code></p>
+        
+        <textarea id="adminMasivoInput" rows="6" placeholder="1|Barajita Oro|https://ejemplo.com/1.png&#10;2|Barajita Plata|https://ejemplo.com/2.png" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-white focus:outline-none focus:border-purple-500 font-mono"></textarea>
+
+        <button onclick="ejecutarCargaMasivaBarajitas()" class="bg-purple-600 hover:bg-purple-500 text-white font-bold py-3 px-6 rounded-xl text-xs transition">
+          PROCESAR Y GUARDAR EN SUPABASE
+        </button>
+      </div>
+    </section>
+
+  </div>
+
+  <script src="admin-script.js"></script>
+</body>
+</html>
