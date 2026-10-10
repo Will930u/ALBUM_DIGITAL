@@ -1,330 +1,217 @@
-// CONFIGURACIÓN DE SUPABASE
+// CONFIGURACIÓN DE SUPABASE Y API
 const SUPABASE_URL = "https://dxicbitnnesjsqzxisea.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR4aWNiaXRubmVzanNxenhpc2VhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE0MTQzMTMsImV4cCI6MjEwNjk5MDMxM30.0xUXIa0Bby7xpJAF_N3y-n_H3SPwVlUBb9m630AFPtw"; 
-
 const API_URL = "https://album-digital.onrender.com";
 
 let supabaseClient = null;
-let deduccionAcumuladaBs = parseFloat(localStorage.getItem('admin_deduccion_bs') || 0);
-window.adminTxCache = {}; // Caché seguro para transacciones
+let currentUser = null;
 
 document.addEventListener('DOMContentLoaded', () => {
   if (window.lucide) {
     lucide.createIcons();
   }
-  
+
+  // Inicializar Supabase
   try {
     if (window.supabase && typeof window.supabase.createClient === 'function') {
       supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-      suscribirCambiosTransacciones();
     }
   } catch (err) {
-    console.error("Error al conectar con Supabase:", err);
+    console.error("Error al conectar con Supabase en cliente:", err);
   }
 
-  loadAdminConfig();
+  // Verificar sesión activa en localStorage
+  const savedUser = localStorage.getItem('album_user');
+  if (savedUser) {
+    try {
+      currentUser = JSON.parse(savedUser);
+      onUserLoggedIn(currentUser);
+    } catch (e) {
+      console.error("Error al leer sesión:", e);
+      localStorage.removeItem('album_user');
+    }
+  }
+
+  cargarTasaBCV();
 });
 
-// SUSCRIPCIÓN EN TIEMPO REAL A LA TABLA TRANSACCIONES
-function suscribirCambiosTransacciones() {
-  if (!supabaseClient) return;
+// 1. GESTIÓN DE AUTENTICACIÓN (LOGIN)
+async function handleLogin(event) {
+  event.preventDefault();
+  
+  const usernameInput = document.getElementById('loginUsername');
+  const passwordInput = document.getElementById('loginPassword');
 
-  supabaseClient
-    .channel('schema-db-changes')
-    .on(
-      'postgres_changes',
-      { event: 'UPDATE', schema: 'public', table: 'transacciones' },
-      (payload) => {
-        console.log('Cambio en tiempo real detectado:', payload);
-        const activeTab = document.querySelector('.admin-tab-btn.active');
-        if (activeTab && activeTab.id === 'tabBtn-compras') {
-          loadAdminCompras();
-        }
-      }
-    )
-    .subscribe();
-}
-
-// NAVEGACIÓN ENTRE PESTAÑAS
-function switchTab(tabName) {
-  document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
-  document.querySelectorAll('.admin-tab-btn').forEach(btn => {
-    btn.classList.remove('active', 'bg-purple-600', 'text-white');
-    btn.classList.add('bg-slate-900', 'text-slate-400');
-  });
-
-  const targetTab = document.getElementById(`tab-${tabName}`);
-  if (targetTab) {
-    targetTab.classList.remove('hidden');
+  if (!usernameInput || !passwordInput) {
+    return alert("⚠️ Error en los campos del formulario de inicio de sesión.");
   }
 
-  const activeBtn = document.getElementById(`tabBtn-${tabName}`);
-  if (activeBtn) {
-    activeBtn.classList.add('active', 'bg-purple-600', 'text-white');
-    activeBtn.classList.remove('bg-slate-900', 'text-slate-400');
-  }
+  const username = usernameInput.value.trim();
+  const password = passwordInput.value.trim();
 
-  if (tabName === 'compras') loadAdminCompras();
-  if (tabName === 'finanzas') calcularEstadisticasFinancieras();
-  if (tabName === 'premios') loadAdminPremios();
-}
-
-// 1. CONFIGURACIÓN Y PAGO MÓVIL
-function loadAdminConfig() {
-  const saved = localStorage.getItem('album_app_config');
-  const config = saved ? JSON.parse(saved) : {
-    logoUrl: 'https://via.placeholder.com/120/581c87/ffffff?text=ALBUM',
-    banco: '0134',
-    cedula: '21101658',
-    telefono: '+584129830982',
-    titular: 'ÁLBUM DIGITAL'
-  };
-
-  const favicon = document.getElementById('faviconTag');
-  if (favicon && config.logoUrl) favicon.href = config.logoUrl;
-
-  const preview = document.getElementById('adminLogoPreview');
-  if (preview && config.logoUrl) preview.src = config.logoUrl;
-
-  if (document.getElementById('adminLogoUrlInput')) document.getElementById('adminLogoUrlInput').value = config.logoUrl || '';
-  if (document.getElementById('adminBancoInput')) document.getElementById('adminBancoInput').value = config.banco || '';
-  if (document.getElementById('adminCedulaInput')) document.getElementById('adminCedulaInput').value = config.cedula || '';
-  if (document.getElementById('adminTelefonoInput')) document.getElementById('adminTelefonoInput').value = config.telefono || '';
-  if (document.getElementById('adminTitularInput')) document.getElementById('adminTitularInput').value = config.titular || '';
-}
-
-function saveAdminConfig() {
-  const config = {
-    logoUrl: document.getElementById('adminLogoUrlInput').value.trim(),
-    banco: document.getElementById('adminBancoInput').value.trim(),
-    cedula: document.getElementById('adminCedulaInput').value.trim(),
-    telefono: document.getElementById('adminTelefonoInput').value.trim(),
-    titular: document.getElementById('adminTitularInput').value.trim()
-  };
-
-  localStorage.setItem('album_app_config', JSON.stringify(config));
-  loadAdminConfig();
-  alert("✅ Configuración de Pago Móvil y Logo guardada con éxito.");
-}
-
-// 2. COMPRAS Y VERIFICACIÓN DE TRANSACCIONES (CON CACHÉ SEGURO)
-async function loadAdminCompras() {
-  const tbody = document.getElementById('adminComprasTableBody');
-  if (!tbody) return;
-  tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-500">Cargando transacciones...</td></tr>`;
-
-  if (!supabaseClient) {
-    tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-amber-400">Verifica la API key de Supabase en admin-script.js.</td></tr>`;
-    return;
+  if (!username || !password) {
+    return alert("⚠️ Por favor ingresa tu usuario y contraseña.");
   }
 
   try {
-    const { data, error } = await supabaseClient.from('transacciones').select('*').order('created_at', { ascending: false });
-    if (error || !data) throw error;
-
-    // Almacenar en caché local para acceso seguro por referencia
-    window.adminTxCache = {};
-    data.forEach(tx => {
-      window.adminTxCache[tx.referencia] = tx;
+    const res = await fetch(`${API_URL}/api/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password })
     });
 
-    if (data.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-500">No hay compras registradas.</td></tr>`;
+    const data = await res.json();
+
+    if (res.ok && data.status === "success") {
+      currentUser = data.user;
+      localStorage.setItem('album_user', JSON.stringify(currentUser));
+      alert(`✅ ¡Bienvenido de nuevo, ${currentUser.nombre || currentUser.username}!`);
+      onUserLoggedIn(currentUser);
+    } else {
+      alert(`Error: ${data.message || 'Usuario o contraseña incorrectos.'}`);
+    }
+  } catch (err) {
+    console.error("Error al conectar con el servidor para el login:", err);
+    alert("❌ Error de conexión al intentar iniciar sesión con el servidor.");
+  }
+}
+
+// 2. GESTIÓN DE REGISTRO
+async function handleRegister(event) {
+  event.preventDefault();
+  
+  const username = document.getElementById('regUsername').value.trim();
+  const password = document.getElementById('regPassword').value.trim();
+  const gmail = document.getElementById('regGmail').value.trim();
+  const banco = document.getElementById('regBanco').value.trim();
+  const cedula = document.getElementById('regCedula').value.trim();
+  const telefono = document.getElementById('regTelefono').value.trim();
+
+  if (!all([username, password, gmail, banco, cedula, telefono])) {
+    return alert("⚠️ Todos los campos de registro son obligatorios.");
+  }
+
+  try {
+    const res = await fetch(`${API_URL}/api/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password, gmail, banco, cedula, telefono })
+    });
+
+    const data = await res.json();
+
+    if (res.ok && data.status === "success") {
+      alert("✅ ¡Cuenta creada con éxito! Ya puedes iniciar sesión.");
+      document.getElementById('formRegister').reset();
+      // Opcional: alternar vista a login
+    } else {
+      alert(`Error: ${data.message || 'No se pudo completar el registro.'}`);
+    }
+  } catch (err) {
+    console.error("Error en registro:", err);
+    alert("❌ Error de conexión con el servidor.");
+  }
+}
+
+// 3. ESTADO POST-LOGIN (Manejo de UI del Álbum)
+function onUserLoggedIn(user) {
+  const loginSection = document.getElementById('loginSection');
+  const albumSection = document.getElementById('albumSection');
+
+  if (loginSection) loginSection.classList.add('hidden');
+  if (albumSection) albumSection.classList.remove('hidden');
+
+  // Actualizar datos del usuario en la interfaz si existen los elementos
+  const userNameDisplay = document.getElementById('userNameDisplay');
+  if (userNameDisplay) userNameDisplay.innerText = user.nombre || user.username;
+
+  const userBarajitasDisplay = document.getElementById('userBarajitasDisplay');
+  if (userBarajitasDisplay) userBarajitasDisplay.innerText = user.cantidad_barajitas || 0;
+
+  const userSaldoDisplay = document.getElementById('userSaldoDisplay');
+  if (userSaldoDisplay) userSaldoDisplay.innerText = `Bs. ${parseFloat(user.saldo_bs || 0).toFixed(2)}`;
+
+  cargarBarajitasColeccion();
+}
+
+// 4. CONSULTAR TASA BCV
+async function cargarTasaBCV() {
+  try {
+    const res = await fetch(`${API_URL}/api/bcv`);
+    const data = await res.json();
+    if (res.ok && data.status === "success") {
+      window.tasaBcvActual = data.promedio;
+      const bcvDisplay = document.getElementById('tasaBcvDisplay');
+      if (bcvDisplay) bcvDisplay.innerText = `Tasa BCV: Bs. ${data.promedio}`;
+    }
+  } catch (e) {
+    console.error("Error al obtener tasa BCV:", e);
+  }
+}
+
+// 5. CARGAR BARAJITAS EN EL ÁLBUM
+async function cargarBarajitasColeccion() {
+  const container = document.getElementById('albumGridContainer');
+  if (!container || !supabaseClient) return;
+
+  try {
+    const { data, error } = await supabaseClient.from('barajitas').select('*').order('numero', { ascending: true });
+    if (error) throw error;
+
+    if (!data || data.length === 0) {
+      container.innerHTML = `<p class="text-slate-400 text-center col-span-full">No hay barajitas registradas aún en el sistema.</p>`;
       return;
     }
 
-    tbody.innerHTML = data.map(tx => `
-      <tr class="hover:bg-slate-950/50">
-        <td class="p-3 font-mono text-purple-400 font-bold">${tx.usuario_id || 'N/A'}</td>
-        <td class="p-3 font-mono">${tx.referencia}</td>
-        <td class="p-3">${tx.barajitas_qty || 0}</td>
-        <td class="p-3 font-bold text-white">Bs. ${parseFloat(tx.monto_bs || 0).toFixed(2)} <span class="text-[10px] text-slate-400">($${tx.monto_usd || 0})</span></td>
-        <td class="p-3">
-          <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${
-            tx.estado === 'aprobado' ? 'bg-emerald-500/20 text-emerald-400' :
-            tx.estado === 'rechazado' ? 'bg-red-500/20 text-red-400' : 'bg-amber-500/20 text-amber-400'
-          }">${tx.estado ? tx.estado.toUpperCase() : 'PENDIENTE'}</span>
-        </td>
-        <td class="p-3 text-center space-x-1">
-          ${tx.estado === 'pendiente' ? `
-            <button onclick="procesarCompraDesdeAdmin('${tx.referencia}', 'aprobado')" class="bg-emerald-600 hover:bg-emerald-500 text-white px-2 py-1 rounded text-[10px] font-bold transition">Aprobar</button>
-            <button onclick="procesarCompraDesdeAdmin('${tx.referencia}', 'rechazado')" class="bg-red-600 hover:bg-red-500 text-white px-2 py-1 rounded text-[10px] font-bold transition">Rechazar</button>
-          ` : '<span class="text-slate-600">-</span>'}
-        </td>
-      </tr>
+    container.innerHTML = data.map(b => `
+      <div class="bg-slate-900 border border-purple-500/30 rounded-xl p-3 text-center shadow-lg">
+        <span class="text-xs font-mono text-purple-400 font-bold">#${b.numero}</span>
+        <div class="my-2 h-32 bg-slate-950 rounded-lg overflow-hidden flex items-center justify-center">
+          <img src="${b.imagen_url}" alt="${b.nombre}" class="object-cover h-full w-full" onerror="this.src='https://via.placeholder.com/150/1e1b4b/ffffff?text=Cromo+#${b.numero}'">
+        </div>
+        <p class="text-sm font-semibold text-white truncate">${b.nombre}</p>
+      </div>
     `).join('');
   } catch (err) {
-    console.error(err);
-    tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-red-400">Error al consultar Supabase.</td></tr>`;
+    console.error("Error cargando colección:", err);
+    container.innerHTML = `<p class="text-red-400 text-center col-span-full">Error al cargar las barajitas del álbum.</p>`;
   }
 }
 
-// FUNCIÓN SEGURA PARA PROCESAR DESDE EL PANEL ADMIN
-async function procesarCompraDesdeAdmin(referencia, nuevoEstado) {
-  const tx = window.adminTxCache[referencia];
-  if (!tx) {
-    alert("⚠️ No se encontró la transacción en memoria. Refresca la lista.");
-    return;
-  }
+// 6. NOTIFICAR COMPRA AL BACKEND Y TELEGRAM
+async function enviarNotificacionCompra(referencia, barajitasQty, montoBs, montoUsd, bancoEmisor, telefonoEmisor) {
+  if (!currentUser) return alert("Debes iniciar sesión para reportar un pago.");
 
   try {
-    const res = await fetch(`${API_URL}/api/admin/procesar-compra`, {
+    const res = await fetch(`${API_URL}/api/notificar-compra`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        referencia: tx.referencia,
-        usuario_id: tx.usuario_id,
-        barajitas_qty: tx.barajitas_qty,
-        monto_bs: tx.monto_bs,
-        estado: nuevoEstado
+        usuario_id: currentUser.id,
+        barajitas_qty: parseInt(barajitasQty),
+        monto_bs: parseFloat(montoBs),
+        monto_usd: parseFloat(montoUsd),
+        banco_emisor: bancoEmisor,
+        telefono_emisor: telefonoEmisor,
+        referencia: referencia
       })
     });
 
     const data = await res.json();
     if (res.ok && data.status === "success") {
-      alert(`✅ Compra marcada como ${nuevoEstado.toUpperCase()} con éxito. Mensaje actualizado en Telegram.`);
-      loadAdminCompras();
+      alert("✅ ¡Pago reportado con éxito! Notificación enviada al administrador.");
     } else {
-      alert(`Error: ${data.message || 'No se pudo actualizar'}`);
+      alert(`Error al reportar: ${data.message || 'Intente nuevamente'}`);
     }
   } catch (err) {
-    console.error("Error al procesar la compra desde admin:", err);
-    alert("Ocurrió un error al conectar con el servidor.");
+    console.error("Error enviando notificación de compra:", err);
+    alert("❌ Error de red al reportar el pago.");
   }
 }
 
-// 3. ESTADÍSTICAS FINANCIERAS (30% GANANCIA)
-async function calcularEstadisticasFinancieras() {
-  if (!supabaseClient) return;
-  try {
-    const { data } = await supabaseClient.from('transacciones').select('monto_bs').eq('estado', 'aprobado');
-    const totalVentasBs = (data || []).reduce((acc, curr) => acc + parseFloat(curr.monto_bs || 0), 0);
-
-    const gananciaPlataformaBs = totalVentasBs * 0.30;
-    const fondoPremiosBs = totalVentasBs * 0.70;
-    const saldoBancoReal = totalVentasBs - deduccionAcumuladaBs;
-
-    if (document.getElementById('statTotalVentas')) document.getElementById('statTotalVentas').innerText = `Bs. ${totalVentasBs.toFixed(2)}`;
-    if (document.getElementById('statFondoPremios')) document.getElementById('statFondoPremios').innerText = `Bs. ${fondoPremiosBs.toFixed(2)}`;
-    if (document.getElementById('statGananciaPlataforma')) document.getElementById('statGananciaPlataforma').innerText = `Bs. ${gananciaPlataformaBs.toFixed(2)}`;
-    if (document.getElementById('statSaldoBancoReal')) document.getElementById('statSaldoBancoReal').innerText = `Bs. ${saldoBancoReal.toFixed(2)}`;
-  } catch (e) {
-    console.error("Error calculando estadísticas:", e);
-  }
-}
-
-function aplicarDeduccionBancaria() {
-  const monto = parseFloat(document.getElementById('adminDeduccionInput').value || 0);
-  if (monto <= 0) return alert("Ingresa un monto válido");
-  deduccionAcumuladaBs += monto;
-  localStorage.setItem('admin_deduccion_bs', deduccionAcumuladaBs);
-  document.getElementById('adminDeduccionInput').value = '';
-  document.getElementById('adminDeduccionNota').value = '';
-  calcularEstadisticasFinancieras();
-  alert(`Deducción aplicada. Total deducido: Bs. ${deduccionAcumuladaBs.toFixed(2)}`);
-}
-
-// 4. SOLICITUDES DE PREMIOS
-async function loadAdminPremios() {
-  const tbody = document.getElementById('adminPremiosTableBody');
-  if (!tbody) return;
-  tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-slate-500">Cargando solicitudes...</td></tr>`;
-
-  if (!supabaseClient) return;
-
-  try {
-    const { data } = await supabaseClient.from('retiros_premios').select('*').order('created_at', { ascending: false });
-    if (!data || data.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-slate-500">No hay solicitudes de premios.</td></tr>`;
-      return;
-    }
-
-    tbody.innerHTML = data.map(r => `
-      <tr class="hover:bg-slate-950/50">
-        <td class="p-3 font-mono">${r.id}</td>
-        <td class="p-3 font-bold text-white">${r.usuario_id}</td>
-        <td class="p-3">Hito #${r.milestone}</td>
-        <td class="p-3 font-bold text-amber-400">$${r.monto_usd} USD (Bs. ${r.monto_bs})</td>
-        <td class="p-3">${r.datos_pago}</td>
-        <td class="p-3"><span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${r.estado === 'aprobado' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}">${r.estado}</span></td>
-        <td class="p-3 text-center">
-          ${r.estado === 'pendiente' ? `<button onclick="marcarPremioPagado('${r.id}')" class="bg-emerald-600 hover:bg-emerald-500 text-white px-2 py-1 rounded text-[10px] font-bold transition">Marcar Pagado</button>` : '-'}
-        </td>
-      </tr>
-    `).join('');
-  } catch (e) {
-    tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-red-400">Error al consultar retiros.</td></tr>`;
-  }
-}
-
-async function marcarPremioPagado(id) {
-  if (!supabaseClient) return;
-  await supabaseClient.from('retiros_premios').update({ estado: 'aprobado' }).eq('id', id);
-  loadAdminPremios();
-}
-
-// 5. CARGA MASIVA DE BARAJITAS MEDIANTE ARCHIVOS JPG / PNG
-async function ejecutarCargaMasivaArchivos() {
-  if (!supabaseClient) return alert("Cliente de Supabase no conectado.");
-  
-  const fileInput = document.getElementById('adminFileImages');
-  const statusText = document.getElementById('uploadStatusText');
-  
-  if (!fileInput || fileInput.files.length === 0) {
-    return alert("⚠️ Por favor selecciona al menos una imagen JPG o PNG.");
-  }
-
-  const fileList = Array.from(fileInput.files);
-  let exitosas = 0;
-  
-  statusText.innerText = `Subiendo 0 de ${fileList.length} barajitas...`;
-
-  for (let i = 0; i < fileList.length; i++) {
-    const archivoActual = fileList[i];
-    const nombreArchivo = archivoActual.name;
-    
-    const matchNumber = nombreArchivo.match(/\d+/);
-    const numeroBarajita = matchNumber ? parseInt(matchNumber[0]) : (i + 1);
-    
-    statusText.innerText = `Procesando barajita #${numeroBarajita} (${i + 1} de ${fileList.length})...`;
-
-    try {
-      const uniqueFileName = `barajita_${numeroBarajita}_${Date.now()}.${nombreArchivo.split('.').pop()}`;
-      
-      const { data: uploadData, error: uploadError } = await supabaseClient.storage
-        .from('barajitas')
-        .upload(uniqueFileName, archivoActual, { upsert: true });
-
-      if (uploadError) {
-        console.error(`Error subiendo archivo ${nombreArchivo}:`, uploadError.message);
-        continue;
-      }
-
-      const { data: publicUrlData } = supabaseClient.storage
-        .from('barajitas')
-        .getPublicUrl(uniqueFileName);
-
-      const imageUrl = publicUrlData.publicUrl;
-
-      const { error: dbError } = await supabaseClient
-        .from('barajitas')
-        .upsert({
-          numero: numeroBarajita,
-          nombre: `Cromo Coleccionable #${numeroBarajita}`,
-          imagen_url: imageUrl
-        }, { onConflict: 'numero' });
-
-      if (!dbError) {
-        exitosas++;
-      } else {
-        console.error(`Error guardando en BD la barajita #${numeroBarajita}:`, dbError.message);
-      }
-    } catch (err) {
-      console.error(`Excepción con el archivo ${nombreArchivo}:`, err);
-    }
-  }
-
-  statusText.innerText = `✅ ¡Carga masiva finalizada! Se registraron ${exitosas} de ${fileList.length} barajitas con éxito.`;
-  alert(`✅ Proceso completado. ${exitosas} barajitas guardadas correctamente.`);
-  fileInput.value = '';
+// 7. CERRAR SESIÓN
+function handleLogout() {
+  localStorage.removeItem('album_user');
+  currentUser = null;
+  window.location.reload();
 }
