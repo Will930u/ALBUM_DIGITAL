@@ -1,20 +1,22 @@
 // CONFIGURACIÓN DE SUPABASE
 const SUPABASE_URL = "https://dxicbitnnesjsqzxisea.supabase.co";
-// Reemplaza esta cadena con tu anon key de Supabase (Project Settings -> API -> anon public key)
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR4aWNiaXRubmVzanNxenhpc2VhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE0MTQzMTMsImV4cCI6MjEwNjk5MDMxM30.0xUXIa0Bby7xpJAF_N3y-n_H3SPwVlUBb9m630AFPtw"; 
+
+const API_URL = "https://album-digital.onrender.com";
 
 let supabaseClient = null;
 let deduccionAcumuladaBs = parseFloat(localStorage.getItem('admin_deduccion_bs') || 0);
+window.adminTxCache = {}; // Caché seguro para transacciones
 
 document.addEventListener('DOMContentLoaded', () => {
   if (window.lucide) {
     lucide.createIcons();
   }
   
-  // Inicialización segura del cliente Supabase
   try {
     if (window.supabase && typeof window.supabase.createClient === 'function') {
       supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      suscribirCambiosTransacciones();
     }
   } catch (err) {
     console.error("Error al conectar con Supabase:", err);
@@ -22,6 +24,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
   loadAdminConfig();
 });
+
+// SUSCRIPCIÓN EN TIEMPO REAL A LA TABLA TRANSACCIONES
+function suscribirCambiosTransacciones() {
+  if (!supabaseClient) return;
+
+  supabaseClient
+    .channel('schema-db-changes')
+    .on(
+      'postgres_changes',
+      { event: 'UPDATE', schema: 'public', table: 'transacciones' },
+      (payload) => {
+        console.log('Cambio en tiempo real detectado:', payload);
+        const activeTab = document.querySelector('.admin-tab-btn.active');
+        if (activeTab && activeTab.id === 'tabBtn-compras') {
+          loadAdminCompras();
+        }
+      }
+    )
+    .subscribe();
+}
 
 // NAVEGACIÓN ENTRE PESTAÑAS
 function switchTab(tabName) {
@@ -85,7 +107,7 @@ function saveAdminConfig() {
   alert("✅ Configuración de Pago Móvil y Logo guardada con éxito.");
 }
 
-// 2. COMPRAS Y VERIFICACIÓN
+// 2. COMPRAS Y VERIFICACIÓN DE TRANSACCIONES (CON CACHÉ SEGURO)
 async function loadAdminCompras() {
   const tbody = document.getElementById('adminComprasTableBody');
   if (!tbody) return;
@@ -100,6 +122,12 @@ async function loadAdminCompras() {
     const { data, error } = await supabaseClient.from('transacciones').select('*').order('created_at', { ascending: false });
     if (error || !data) throw error;
 
+    // Almacenar en caché local para acceso seguro por referencia
+    window.adminTxCache = {};
+    data.forEach(tx => {
+      window.adminTxCache[tx.referencia] = tx;
+    });
+
     if (data.length === 0) {
       tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-500">No hay compras registradas.</td></tr>`;
       return;
@@ -107,10 +135,10 @@ async function loadAdminCompras() {
 
     tbody.innerHTML = data.map(tx => `
       <tr class="hover:bg-slate-950/50">
-        <td class="p-3 font-mono text-purple-400 font-bold">${tx.usuario_id}</td>
+        <td class="p-3 font-mono text-purple-400 font-bold">${tx.usuario_id || 'N/A'}</td>
         <td class="p-3 font-mono">${tx.referencia}</td>
-        <td class="p-3">${tx.barajitas_qty}</td>
-        <td class="p-3 font-bold text-white">Bs. ${parseFloat(tx.monto_bs).toFixed(2)} <span class="text-[10px] text-slate-400">($${tx.monto_usd})</span></td>
+        <td class="p-3">${tx.barajitas_qty || 0}</td>
+        <td class="p-3 font-bold text-white">Bs. ${parseFloat(tx.monto_bs || 0).toFixed(2)} <span class="text-[10px] text-slate-400">($${tx.monto_usd || 0})</span></td>
         <td class="p-3">
           <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${
             tx.estado === 'aprobado' ? 'bg-emerald-500/20 text-emerald-400' :
@@ -119,8 +147,8 @@ async function loadAdminCompras() {
         </td>
         <td class="p-3 text-center space-x-1">
           ${tx.estado === 'pendiente' ? `
-            <button onclick="procesarEstadoCompra('${tx.referencia}', '${tx.usuario_id}', ${tx.barajitas_qty},${tx.monto_bs}, 'aprobado')" class="bg-emerald-600 hover:bg-emerald-500 text-white px-2 py-1 rounded text-[10px] font-bold transition">Aprobar</button>
-            <button onclick="procesarEstadoCompra('${tx.referencia}', '${tx.usuario_id}', ${tx.barajitas_qty},${tx.monto_bs}, 'rechazado')" class="bg-red-600 hover:bg-red-500 text-white px-2 py-1 rounded text-[10px] font-bold transition">Rechazar</button>
+            <button onclick="procesarCompraDesdeAdmin('${tx.referencia}', 'aprobado')" class="bg-emerald-600 hover:bg-emerald-500 text-white px-2 py-1 rounded text-[10px] font-bold transition">Aprobar</button>
+            <button onclick="procesarCompraDesdeAdmin('${tx.referencia}', 'rechazado')" class="bg-red-600 hover:bg-red-500 text-white px-2 py-1 rounded text-[10px] font-bold transition">Rechazar</button>
           ` : '<span class="text-slate-600">-</span>'}
         </td>
       </tr>
@@ -131,18 +159,23 @@ async function loadAdminCompras() {
   }
 }
 
-const API_URL = "https://album-digital.onrender.com";
+// FUNCIÓN SEGURA PARA PROCESAR DESDE EL PANEL ADMIN
+async function procesarCompraDesdeAdmin(referencia, nuevoEstado) {
+  const tx = window.adminTxCache[referencia];
+  if (!tx) {
+    alert("⚠️ No se encontró la transacción en memoria. Refresca la lista.");
+    return;
+  }
 
-async function procesarEstadoCompra(referencia, usuarioId, barajitasQty, montoBs, nuevoEstado) {
   try {
     const res = await fetch(`${API_URL}/api/admin/procesar-compra`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        referencia: referencia,
-        usuario_id: usuarioId,
-        barajitas_qty: barajitasQty,
-        monto_bs: montoBs,
+        referencia: tx.referencia,
+        usuario_id: tx.usuario_id,
+        barajitas_qty: tx.barajitas_qty,
+        monto_bs: tx.monto_bs,
         estado: nuevoEstado
       })
     });
@@ -241,29 +274,29 @@ async function ejecutarCargaMasivaArchivos() {
     return alert("⚠️ Por favor selecciona al menos una imagen JPG o PNG.");
   }
 
-  const files = Array.from(fileInput.files);
+  const fileList = Array.from(fileInput.files);
   let exitosas = 0;
   
-  statusText.innerText = `Subiendo 0 de ${files.length} barajitas...`;
+  statusText.innerText = `Subiendo 0 de ${fileList.length} barajitas...`;
 
-  for (let i = 0; i < files.length; i++) {
-    const file = files[i];
-    const fileNameStr = file.name; 
+  for (let i = 0; i < fileList.length; i++) {
+    const archivoActual = fileList[i];
+    const nombreArchivo = archivoActual.name;
     
-    const matchNumber = fileNameStr.match(/\d+/);
+    const matchNumber = nombreArchivo.match(/\d+/);
     const numeroBarajita = matchNumber ? parseInt(matchNumber[0]) : (i + 1);
     
-    statusText.innerText = `Procesando barajita #${numeroBarajita} (${i + 1} de ${files.length})...`;
+    statusText.innerText = `Procesando barajita #${numeroBarajita} (${i + 1} de ${fileList.length})...`;
 
     try {
-      const uniqueFileName = `barajita_${numeroBarajita}_${Date.now()}.${fileNameStr.split('.').pop()}`;
+      const uniqueFileName = `barajita_${numeroBarajita}_${Date.now()}.${nombreArchivo.split('.').pop()}`;
       
       const { data: uploadData, error: uploadError } = await supabaseClient.storage
         .from('barajitas')
-        .upload(uniqueFileName, file, { upsert: true });
+        .upload(uniqueFileName, archivoActual, { upsert: true });
 
       if (uploadError) {
-        console.error(`Error subiendo archivo ${fileNameStr}:`, uploadError.message);
+        console.error(`Error subiendo archivo ${nombreArchivo}:`, uploadError.message);
         continue;
       }
 
@@ -287,11 +320,11 @@ async function ejecutarCargaMasivaArchivos() {
         console.error(`Error guardando en BD la barajita #${numeroBarajita}:`, dbError.message);
       }
     } catch (err) {
-      console.error(`Excepción con el archivo ${fileNameStr}:`, err);
+      console.error(`Excepción con el archivo ${nombreArchivo}:`, err);
     }
   }
 
-  statusText.innerText = `✅ ¡Carga masiva finalizada! Se registraron ${exitosas} de ${files.length} barajitas con éxito.`;
+  statusText.innerText = `✅ ¡Carga masiva finalizada! Se registraron ${exitosas} de ${fileList.length} barajitas con éxito.`;
   alert(`✅ Proceso completado. ${exitosas} barajitas guardadas correctamente.`);
   fileInput.value = '';
 }
