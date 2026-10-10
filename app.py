@@ -14,6 +14,9 @@ SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("SU
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_ADMIN_CHAT_ID = os.environ.get("TELEGRAM_ADMIN_CHAT_ID", "")
 
+# URL del Panel Administrador Independiente en GitHub Pages
+ADMIN_PANEL_URL = "https://will930u.github.io/ALBUM_DIGITAL/admin.html"
+
 # Cliente Supabase
 supabase_client: Client = None
 if SUPABASE_URL and SUPABASE_KEY:
@@ -42,7 +45,7 @@ def send_telegram_inline_keyboard(chat_id: str, text: str, reply_markup: dict):
 
 @app.route("/", methods=["GET"])
 def index():
-    return jsonify({"status": "online", "service": "Backend Álbum Digital Botones Telegram", "version": "2.5.0"}), 200
+    return jsonify({"status": "online", "service": "Backend Álbum Digital Botones Telegram & Admin Panel", "version": "2.6.0"}), 200
 
 @app.route("/api/bcv", methods=["GET"])
 def get_bcv_rate():
@@ -159,6 +162,7 @@ def notificar_compra():
         except Exception as e:
             print(f"Error insertando transacción: {e}")
 
+    # Notificación con Botones Interactivos + Acceso al Panel Admin
     text = (
         f"🛒 <b>NUEVA SOLICITUD DE COMPRA</b>\n\n"
         f"👤 <b>Usuario ID:</b> <code>{usuario_id}</code>\n"
@@ -173,6 +177,9 @@ def notificar_compra():
             [
                 {"text": "🟢 APROBAR COMPRA", "callback_data": f"aprob_compra:{referencia}:{usuario_id}:{barajitas_qty}:{monto_bs}"},
                 {"text": "🔴 RECHAZAR", "callback_data": f"rech_compra:{referencia}"}
+            ],
+            [
+                {"text": "⚙️ ABRIR PANEL DE ADMINISTRACIÓN", "url": ADMIN_PANEL_URL}
             ]
         ]
     }
@@ -223,6 +230,9 @@ def notificar_retiro():
             [
                 {"text": "🟢 CONFIRMAR PAGO REALIZADO", "callback_data": f"aprob_retiro:{retiro_id}:{usuario_id}:{monto_bs}"},
                 {"text": "🔴 RECHAZAR", "callback_data": f"rech_retiro:{retiro_id}"}
+            ],
+            [
+                {"text": "⚙️ ABRIR PANEL DE ADMINISTRACIÓN", "url": ADMIN_PANEL_URL}
             ]
         ]
     }
@@ -234,6 +244,29 @@ def notificar_retiro():
 def webhook_telegram():
     data = request.get_json(silent=True) or {}
 
+    # Procesar comando /admin directo en el chat
+    if "message" in data:
+        msg = data["message"]
+        text_received = msg.get("text", "")
+        chat_id = msg["chat"]["id"]
+
+        if text_received == "/admin":
+            admin_msg = (
+                "🔐 <b>ACCESO AL PANEL ADMINISTRATIVO</b>\n\n"
+                "Presiona el botón de abajo para gestionar compras, retiros de premios, "
+                "datos de Pago Móvil, logo de la app y carga masiva de barajitas."
+            )
+            admin_markup = {
+                "inline_keyboard": [
+                    [
+                        {"text": "⚙️ ABRIR PANEL ADMIN", "url": ADMIN_PANEL_URL}
+                    ]
+                ]
+            }
+            send_telegram_inline_keyboard(chat_id, admin_msg, admin_markup)
+            return jsonify({"status": "ok"}), 200
+
+    # Procesar Callback Queries (Botones Aprobación / Rechazo)
     if "callback_query" in data:
         callback = data["callback_query"]
         callback_id = callback["id"]
