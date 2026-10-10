@@ -23,8 +23,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   initSupabase();
   await fetchBcvRate();
   checkSession();
+  cargarDatosPagoMovilTienda(); // <--- CARGA LOS DATOS DEL ADMIN EN LA TIENDA
 
-  // Escuchar si el usuario llegó desde un correo de recuperación
   if (STATE.supabase) {
     STATE.supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'PASSWORD_RECOVERY') {
@@ -35,10 +35,26 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 });
 
+// FUNCIÓN PARA CARGAR DATOS DE PAGO MÓVIL EN LA TIENDA
+function cargarDatosPagoMovilTienda() {
+  const saved = localStorage.getItem('album_app_config');
+  const config = saved ? JSON.parse(saved) : {
+    banco: '0134',
+    cedula: '21101658',
+    telefono: '+584129830982',
+    titular: 'ÁLBUM DIGITAL'
+  };
+
+  if (document.getElementById('displayBanco')) document.getElementById('displayBanco').innerText = config.banco;
+  if (document.getElementById('displayCedula')) document.getElementById('displayCedula').innerText = config.cedula;
+  if (document.getElementById('displayTelefono')) document.getElementById('displayTelefono').innerText = config.telefono;
+  if (document.getElementById('displayTitular')) document.getElementById('displayTitular').innerText = config.titular;
+}
+
 // Inicialización de Supabase con ventana y seguridad
 function initSupabase() {
-  const SUPABASE_URL = "https://dxicbitnnesjsqzxisea.supabase.co"; // Coloca tu URL de Supabase
-  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR4aWNiaXRubmVzanNxenhpc2VhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE0MTQzMTMsImV4cCI6MjEwNjk5MDMxM30.0xUXIa0Bby7xpJAF_N3y-n_H3SPwVlUBb9m630AFPtw"; // Coloca tu Anon Key de Supabase
+  const SUPABASE_URL = "https://dxicbitnnesjsqzxisea.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR4aWNiaXRubmVzanNxenhpc2VhIivaG9sZSI6ImFub24iLCJpYXQiOjE3OTE0MTQzMTMsImV4cCI6MjEwNjk5MDMxM30.0xUXIa0Bby7xpJAF_N3y-n_H3SPwVlUBb9m630AFPtw";
 
   if (window.supabase && SUPABASE_URL && SUPABASE_ANON_KEY) {
     try {
@@ -175,20 +191,12 @@ async function handleForgotPassword(e) {
     return;
   }
 
-  if (!STATE.supabase) {
-    initSupabase();
-  }
-
-  if (!STATE.supabase) {
-    alert("Error: No se pudo establecer conexión con el cliente de Supabase.");
-    return;
-  }
+  if (!STATE.supabase) initSupabase();
 
   btn.disabled = true;
   btn.innerText = "ENVIANDO CORREO...";
 
   try {
-    // Solicitud real a Supabase Auth para enviar el correo
     const { data, error } = await STATE.supabase.auth.resetPasswordForEmail(emailInput, {
       redirectTo: 'https://will930u.github.io/ALBUM_DIGITAL/'
     });
@@ -196,11 +204,10 @@ async function handleForgotPassword(e) {
     if (error) {
       alert(`Error al enviar correo: ${error.message}`);
     } else {
-      alert(`✅ Se ha enviado un enlace de recuperación a ${emailInput}. Revisa tu bandeja de entrada y la carpeta de Spam.`);
+      alert(`✅ Se ha enviado un enlace de recuperación a ${emailInput}. Revisa tu bandeja.`);
       showAuthTab('login');
     }
   } catch (err) {
-    console.error("Error en forgotPassword:", err);
     alert("Ocurrió un error inesperado al conectar con Supabase.");
   } finally {
     btn.disabled = false;
@@ -295,10 +302,16 @@ function calculateTotal() {
   document.getElementById('totalBsDisplay').innerText = `Bs. ${totalBs.toFixed(2)}`;
 }
 
+// ----------------------------------------------------
+// FUNCIÓN ACTUALIZADA CON BANCO, TELÉFONO Y REFERENCIA
+// ----------------------------------------------------
 async function submitPurchase(e) {
   e.preventDefault();
   const qty = parseInt(document.getElementById('stickerQty').value);
-  const ref = document.getElementById('refInput').value;
+  const bancoEmisor = document.getElementById('tiendaBancoEmisor').value.trim();
+  const telefonoEmisor = document.getElementById('tiendaTelefonoEmisor').value.trim();
+  const ref = document.getElementById('refInput').value.trim();
+  
   const totalBs = (qty * 0.62) * STATE.bcvRate;
   const totalUSD = qty * 0.62;
 
@@ -315,13 +328,17 @@ async function submitPurchase(e) {
         barajitas_qty: qty,
         monto_bs: totalBs,
         monto_usd: totalUSD,
+        banco_emisor: bancoEmisor,
+        telefono_emisor: telefonoEmisor,
         referencia: ref
       })
     });
     const data = await res.json();
     if (res.ok && data.status === 'success') {
-      alert('¡Pago reportado! Notificación con botones enviada a Telegram.');
+      alert('¡Pago reportado con éxito! El administrador verificará la transferencia.');
       document.getElementById('refInput').value = '';
+      document.getElementById('tiendaBancoEmisor').value = '';
+      document.getElementById('tiendaTelefonoEmisor').value = '';
       switchTab('album');
     } else {
       alert('Error registrando el pago');
@@ -386,6 +403,7 @@ function setupLogoClickCounter() {
 function exitAdmin() {
   switchTab('album');
 }
+
 async function handleResetPassword(e) {
   e.preventDefault();
   const newPassword = document.getElementById('newPasswordInput').value.trim();
@@ -400,7 +418,6 @@ async function handleResetPassword(e) {
   btn.innerText = "GUARDANDO...";
 
   try {
-    // 1. Actualizar contraseña en Supabase Auth
     const { data, error } = await STATE.supabase.auth.updateUser({
       password: newPassword
     });
@@ -410,10 +427,8 @@ async function handleResetPassword(e) {
       return;
     }
 
-    // Obtener el correo del usuario recuperado
     const userEmail = data.user ? data.user.email : null;
 
-    // 2. Sincronizar nueva contraseña con el Backend en Render (public.usuarios)
     if (userEmail) {
       await fetch(`${API_URL}/api/update-password`, {
         method: 'POST',
@@ -428,7 +443,6 @@ async function handleResetPassword(e) {
     alert("✅ ¡Contraseña actualizada con éxito! Ya puedes iniciar sesión con tu nueva clave.");
     showAuthTab('login');
   } catch (err) {
-    console.error("Error al restablecer contraseña:", err);
     alert("Ocurrió un error inesperado al actualizar la contraseña.");
   } finally {
     btn.disabled = false;
