@@ -1,7 +1,8 @@
 // CONFIGURACIÓN DE SUPABASE
 const SUPABASE_URL = "https://dxicbitnnesjsqzxisea.supabase.co";
-// Reemplaza esta cadena con tu anon key de Supabase (Project Settings -> API -> anon public key)
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR4aWNiaXRubmVzanNxenhpc2VhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE0MTQzMTMsImV4cCI6MjEwNjk5MDMxM30.0xUXIa0Bby7xpJAF_N3y-n_H3SPwVlUBb9m630AFPtw"; 
+
+const API_URL = "https://album-digital.onrender.com";
 
 let supabaseClient = null;
 let deduccionAcumuladaBs = parseFloat(localStorage.getItem('admin_deduccion_bs') || 0);
@@ -11,7 +12,6 @@ document.addEventListener('DOMContentLoaded', () => {
     lucide.createIcons();
   }
   
-  // Inicialización segura del cliente Supabase
   try {
     if (window.supabase && typeof window.supabase.createClient === 'function') {
       supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -85,7 +85,7 @@ function saveAdminConfig() {
   alert("✅ Configuración de Pago Móvil y Logo guardada con éxito.");
 }
 
-// 2. COMPRAS Y VERIFICACIÓN
+// 2. COMPRAS Y VERIFICACIÓN DE TRANSACCIONES
 async function loadAdminCompras() {
   const tbody = document.getElementById('adminComprasTableBody');
   if (!tbody) return;
@@ -119,8 +119,8 @@ async function loadAdminCompras() {
         </td>
         <td class="p-3 text-center space-x-1">
           ${tx.estado === 'pendiente' ? `
-            <button onclick="procesarEstadoCompra('${tx.referencia}', '${tx.usuario_id}', ${tx.barajitas_qty}, ${tx.monto_bs}, 'aprobado')" class="bg-emerald-600 text-white px-2 py-1 rounded text-[10px] font-bold">Aprobar</button>
-            <button onclick="procesarEstadoCompra('${tx.referencia}', '${tx.usuario_id}', 0, 0, 'rechazado')" class="bg-red-600 text-white px-2 py-1 rounded text-[10px] font-bold">Rechazar</button>
+            <button onclick="procesarEstadoCompra('${tx.referencia}', '${tx.usuario_id}', ${tx.barajitas_qty},${tx.monto_bs}, 'aprobado')" class="bg-emerald-600 hover:bg-emerald-500 text-white px-2 py-1 rounded text-[10px] font-bold transition">Aprobar</button>
+            <button onclick="procesarEstadoCompra('${tx.referencia}', '${tx.usuario_id}', ${tx.barajitas_qty},${tx.monto_bs}, 'rechazado')" class="bg-red-600 hover:bg-red-500 text-white px-2 py-1 rounded text-[10px] font-bold transition">Rechazar</button>
           ` : '<span class="text-slate-600">-</span>'}
         </td>
       </tr>
@@ -131,8 +131,7 @@ async function loadAdminCompras() {
   }
 }
 
-const API_URL = "https://album-digital.onrender.com";
-
+// ACCIÓN PROCESAR COMPRA (SINCRONIZA BASE DE DATOS Y NOTIFICA A TELEGRAM)
 async function procesarEstadoCompra(referencia, usuarioId, barajitasQty, montoBs, nuevoEstado) {
   try {
     const res = await fetch(`${API_URL}/api/admin/procesar-compra`, {
@@ -149,7 +148,7 @@ async function procesarEstadoCompra(referencia, usuarioId, barajitasQty, montoBs
 
     const data = await res.json();
     if (res.ok && data.status === "success") {
-      alert(`✅ Compra marcada como ${nuevoEstado.toUpperCase()} con éxito.`);
+      alert(`✅ Compra marcada como ${nuevoEstado.toUpperCase()} con éxito. Mensaje actualizado en Telegram.`);
       loadAdminCompras();
     } else {
       alert(`Error: ${data.message || 'No se pudo actualizar'}`);
@@ -215,7 +214,7 @@ async function loadAdminPremios() {
         <td class="p-3">${r.datos_pago}</td>
         <td class="p-3"><span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${r.estado === 'aprobado' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}">${r.estado}</span></td>
         <td class="p-3 text-center">
-          ${r.estado === 'pendiente' ? `<button onclick="marcarPremioPagado('${r.id}')" class="bg-emerald-600 text-white px-2 py-1 rounded text-[10px] font-bold">Marcar Pagado</button>` : '-'}
+          ${r.estado === 'pendiente' ? `<button onclick="marcarPremioPagado('${r.id}')" class="bg-emerald-600 hover:bg-emerald-500 text-white px-2 py-1 rounded text-[10px] font-bold transition">Marcar Pagado</button>` : '-'}
         </td>
       </tr>
     `).join('');
@@ -232,7 +231,7 @@ async function marcarPremioPagado(id) {
 
 // 5. CARGA MASIVA DE BARAJITAS MEDIANTE ARCHIVOS JPG / PNG
 async function ejecutarCargaMasivaArchivos() {
-  if (!supabaseClient) return alert("Cliente de Supabase não conectado.");
+  if (!supabaseClient) return alert("Cliente de Supabase no conectado.");
   
   const fileInput = document.getElementById('adminFileImages');
   const statusText = document.getElementById('uploadStatusText');
@@ -241,42 +240,38 @@ async function ejecutarCargaMasivaArchivos() {
     return alert("⚠️ Por favor selecciona al menos una imagen JPG o PNG.");
   }
 
-  const files = Array.from(fileInput.files);
+  const fileList = Array.from(fileInput.files);
   let exitosas = 0;
   
-  statusText.innerText = `Subiendo 0 de ${files.length} barajitas...`;
+  statusText.innerText = `Subiendo 0 de ${fileList.length} barajitas...`;
 
-  for (let i = 0; i < files.length; i++) {
-    const file = files[i];
-    const fileNameStr = file.name; // <--- Corrección aquí: usar file.name en lugar de file
+  for (let i = 0; i < fileList.length; i++) {
+    const archivoActual = fileList[i];
+    const nombreArchivo = archivoActual.name;
     
-    // Extraer el número del nombre del archivo (Ej: "1.png" -> 1, "cromo_15.jpg" -> 15)
-    const matchNumber = fileNameStr.match(/\d+/);
+    const matchNumber = nombreArchivo.match(/\d+/);
     const numeroBarajita = matchNumber ? parseInt(matchNumber[0]) : (i + 1);
     
-    statusText.innerText = `Procesando barajita #${numeroBarajita} (${i + 1} de ${files.length})...`;
+    statusText.innerText = `Procesando barajita #${numeroBarajita} (${i + 1} de ${fileList.length})...`;
 
     try {
-      // 1. Subir la imagen al Storage de Supabase (Bucket 'barajitas')
-      const uniqueFileName = `barajita_${numeroBarajita}_${Date.now()}.${fileNameStr.split('.').pop()}`;
+      const uniqueFileName = `barajita_${numeroBarajita}_${Date.now()}.${nombreArchivo.split('.').pop()}`;
       
       const { data: uploadData, error: uploadError } = await supabaseClient.storage
         .from('barajitas')
-        .upload(uniqueFileName, file, { upsert: true });
+        .upload(uniqueFileName, archivoActual, { upsert: true });
 
       if (uploadError) {
-        console.error(`Error subiendo archivo ${fileNameStr}:`, uploadError.message);
+        console.error(`Error subiendo archivo ${nombreArchivo}:`, uploadError.message);
         continue;
       }
 
-      // 2. Obtener la URL pública de la imagen en Supabase Storage
       const { data: publicUrlData } = supabaseClient.storage
         .from('barajitas')
         .getPublicUrl(uniqueFileName);
 
       const imageUrl = publicUrlData.publicUrl;
 
-      // 3. Registrar o actualizar en la tabla 'barajitas' de Supabase
       const { error: dbError } = await supabaseClient
         .from('barajitas')
         .upsert({
@@ -291,11 +286,11 @@ async function ejecutarCargaMasivaArchivos() {
         console.error(`Error guardando en BD la barajita #${numeroBarajita}:`, dbError.message);
       }
     } catch (err) {
-      console.error(`Excepción con el archivo ${fileNameStr}:`, err);
+      console.error(`Excepción con el archivo ${nombreArchivo}:`, err);
     }
   }
 
-  statusText.innerText = `✅ ¡Carga masiva finalizada! Se registraron ${exitosas} de ${files.length} barajitas con éxito.`;
+  statusText.innerText = `✅ ¡Carga masiva finalizada! Se registraron ${exitosas} de ${fileList.length} barajitas con éxito.`;
   alert(`✅ Proceso completado. ${exitosas} barajitas guardadas correctamente.`);
   fileInput.value = '';
 }
