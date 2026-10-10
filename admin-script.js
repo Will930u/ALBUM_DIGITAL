@@ -1,6 +1,6 @@
 // CONFIGURACIÓN DE SUPABASE
-const SUPABASE_URL = "https://ddbdemxrntjqncetyrnr.supabase.co";
-const SUPABASE_ANON_KEY = "TU_SUPABASE_ANON_KEY_AQUI"; // Poner tu Anon Key real
+const SUPABASE_URL = "https://dxicbitnnesjsqzxisea.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR4aWNiaXRubmVzanNxenhpc2VhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE0MTQzMTMsImV4cCI6MjEwNjk5MDMxM30.0xUXIa0Bby7xpJAF_N3y-n_H3SPwVlUBb9m630AFPtw"; // Poner tu Anon Key real
 const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let deduccionAcumuladaBs = parseFloat(localStorage.getItem('admin_deduccion_bs') || 0);
