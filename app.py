@@ -43,15 +43,15 @@ def send_telegram_inline_keyboard(chat_id: str, text: str, reply_markup: dict):
         return False
 
 def procesar_aprobacion_compra(referencia, usuario_id, qty, monto_bs):
-    """Lógica unificada para abonar barajitas y saldo al usuario."""
+    """Lógica unificada para abonar el 70% neto en saldo Bs y barajitas al usuario."""
     if not supabase_client:
         return False
     try:
         user_net = float(monto_bs) * 0.70
-        # 1. Cambiar estado de la transacción
+        # 1. Cambiar estado de la transacción a aprobado
         supabase_client.table("transacciones").update({"estado": "aprobado"}).eq("referencia", str(referencia)).execute()
         
-        # 2. Consultar usuario y abonar saldo / barajitas
+        # 2. Consultar usuario y sumar barajitas y saldo neto
         u_res = supabase_client.table("usuarios").select("*").eq("id", str(usuario_id)).execute()
         if u_res.data:
             curr_qty = u_res.data[0].get("cantidad_barajitas", 0) or 0
@@ -78,7 +78,7 @@ def procesar_rechazo_compra(referencia):
 
 @app.route("/", methods=["GET"])
 def index():
-    return jsonify({"status": "online", "service": "Backend Álbum Digital Botones Telegram & Admin Panel", "version": "2.7.0"}), 200
+    return jsonify({"status": "online", "service": "Backend Álbum Digital Sincronizado", "version": "3.0.0"}), 200
 
 @app.route("/api/bcv", methods=["GET"])
 def get_bcv_rate():
@@ -126,7 +126,9 @@ def register():
                 "banco": banco,
                 "cedula": cedula,
                 "telefono": telefono,
-                "saldo_usd": 0.0
+                "saldo_usd": 0.0,
+                "cantidad_barajitas": 0,
+                "saldo_bs": 0.0
             }).execute()
 
             user_data = res.data[0] if res.data else {"id": user_id, "username": username}
@@ -163,6 +165,8 @@ def notificar_compra():
     barajitas_qty = data.get("barajitas_qty")
     monto_bs = data.get("monto_bs")
     monto_usd = data.get("monto_usd", 0.0)
+    banco_emisor = data.get("banco_emisor", "N/A")
+    telefono_emisor = data.get("telefono_emisor", "N/A")
     referencia = data.get("referencia")
 
     if not all([usuario_id, barajitas_qty, monto_bs, referencia]):
@@ -189,6 +193,8 @@ def notificar_compra():
         f"👤 <b>Usuario ID:</b> <code>{usuario_id}</code>\n"
         f"📦 <b>Barajitas:</b> {barajitas_qty}\n"
         f"💰 <b>Monto:</b> Bs. {float(monto_bs):.2f} (${float(monto_usd):.2f})\n"
+        f"🏦 <b>Banco Emisor:</b> {banco_emisor}\n"
+        f"📱 <b>Teléfono Emisor:</b> {telefono_emisor}\n"
         f"🔢 <b>Referencia:</b> <code>{referencia}</code>\n"
         f"📌 <b>Estado:</b> PENDIENTE DE APROBACIÓN"
     )
@@ -264,7 +270,6 @@ def notificar_retiro():
 def webhook_telegram():
     data = request.get_json(silent=True) or {}
 
-    # 1. Procesar comando /admin
     if "message" in data:
         msg = data["message"]
         text_received = msg.get("text", "")
@@ -286,7 +291,6 @@ def webhook_telegram():
             send_telegram_inline_keyboard(chat_id, admin_msg, admin_markup)
             return jsonify({"status": "ok"}), 200
 
-    # 2. Procesar Clics en Botones (Callback Queries)
     if "callback_query" in data:
         callback = data["callback_query"]
         callback_id = callback["id"]
@@ -307,7 +311,7 @@ def webhook_telegram():
             monto_bs = float(action_parts[4])
 
             procesar_aprobacion_compra(ref, u_id, qty, monto_bs)
-            nuevo_texto += "\n\n✅ <b>COMPRA APROBADA Y SANGUINIZADA CON ÉXITO</b>"
+            nuevo_texto += "\n\n✅ <b>COMPRA APROBADA Y ABONADA CON ÉXITO</b>"
 
         elif action == "rech_compra":
             ref = action_parts[1]
@@ -326,10 +330,8 @@ def webhook_telegram():
                 supabase_client.table("retiros_premios").update({"estado": "rechazado"}).eq("id", ret_id).execute()
             nuevo_texto += "\n\n🔴 <b>RETIRO RECHAZADO</b>"
 
-        # Notificar a Telegram que el botón fue presionado
         requests.post(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/answerCallbackQuery", json={"callback_query_id": callback_id})
 
-        # Editar el mensaje en Telegram actualizando el texto y dejando el botón de la web
         nuevo_markup = {
             "inline_keyboard": [
                 [
@@ -348,7 +350,6 @@ def webhook_telegram():
 
     return jsonify({"status": "ok"}), 200
 
-# Endpoint para procesar desde el Panel Web (admin-script.js) con la misma lógica
 @app.route("/api/admin/procesar-compra", methods=["POST"])
 def admin_procesar_compra():
     data = request.get_json(silent=True) or {}
