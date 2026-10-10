@@ -263,24 +263,23 @@ def webhook_telegram():
         message_id = message["message_id"]
         original_text = message.get("text", "")
 
-        # 1. Responder de inmediato a Telegram (0.01 segundos)
+        # 1. Responder INMEDIATAMENTE a Telegram para evitar BOT_RESPONSE_TIMEOUT
         try:
             requests.post(
                 f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/answerCallbackQuery", 
-                json={"callback_query_id": callback_id, "text": "⚡ Procesando..."},
+                json={"callback_query_id": callback_id, "text": "⚡ Procesando solicitud..."},
                 timeout=2
             )
         except Exception as e:
-            print(f"Aviso answerCallbackQuery: {e}")
+            print(f"Error answerCallbackQuery: {e}")
 
-        # 2. Ejecutar la lógica pesada de Supabase en un Hilo Secundario Asíncrono
+        # 2. Iniciar procesamiento en segundo plano
         hilo = threading.Thread(
             target=TareaSecundariaTelegram,
             args=(callback_id, chat_id, message_id, callback_data, original_text)
         )
         hilo.start()
 
-        # 3. Retornar OK inmediatamente a Telegram
         return jsonify({"status": "ok"}), 200
 
     return jsonify({"status": "ok"}), 200
