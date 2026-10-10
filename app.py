@@ -312,7 +312,7 @@ def webhook_telegram():
             send_telegram_inline_keyboard(chat_id, admin_msg, admin_markup)
             return jsonify({"status": "ok"}), 200
 
-    # 2. Procesar Clics en Botones (Callback Queries)
+    # 2. Procesar Clics en Botones (Callback Queries) de forma ultrarrápida
     if "callback_query" in data:
         callback = data["callback_query"]
         callback_id = callback["id"]
@@ -321,16 +321,17 @@ def webhook_telegram():
         chat_id = message["chat"]["id"]
         message_id = message["message_id"]
 
-        # Responder INMEDIATAMENTE a Telegram para evitar BOT_RESPONSE_TIMEOUT
+        # === PASO CRÍTICO: Responder DE INMEDIATO a Telegram para matar el Timeout ===
         try:
             requests.post(
                 f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/answerCallbackQuery", 
-                json={"callback_query_id": callback_id, "text": "Procesando..." },
-                timeout=2
+                json={"callback_query_id": callback_id, "text": "⚡ Procesando solicitud..."},
+                timeout=1
             )
         except Exception as e:
-            print(f"Error en answerCallbackQuery: {e}")
+            print(f"Aviso answerCallbackQuery: {e}")
 
+        # Continuar con el procesamiento en segundo plano
         action_parts = callback_data.split(":")
         action = action_parts[0]
         nuevo_texto = message.get("text", "")
@@ -345,12 +346,12 @@ def webhook_telegram():
             if ok:
                 nuevo_texto += "\n\n✅ <b>COMPRA APROBADA Y ABONADA DESDE TELEGRAM</b>"
             else:
-                nuevo_texto += "\n\n⚠️ <b>COMPRA APROBADA (REVISAR SALDO)</b>"
+                nuevo_texto += "\n\n⚠️ <b>COMPRA PROCESADA (VERIFICAR EN BD)</b>"
 
         elif action == "rech_compra" and len(action_parts) >= 2:
             ref = action_parts[1]
             procesar_rechazo_compra(ref)
-            nuevo_texto += "\n\n🔴 <b>COMPRA RECHAZADA</b>"
+            nuevo_texto += "\n\n🔴 <b>COMPRA RECHAZADA DESDE TELEGRAM</b>"
 
         elif action == "aprob_retiro" and len(action_parts) >= 2:
             ret_id = action_parts[1]
@@ -362,9 +363,9 @@ def webhook_telegram():
             ret_id = action_parts[1]
             if supabase_client and ret_id:
                 supabase_client.table("retiros_premios").update({"estado": "rechazado"}).eq("id", ret_id).execute()
-            nuevo_texto += "\n\n🔴 <b>RETIRO RECHAZADO</b>"
+            nuevo_texto += "\n\n🔴 <b>RETIRO RECHAZADO DESDE TELEGRAM</b>"
 
-        # Editar el mensaje en Telegram removiendo los botones de acción
+        # Remover los botones de 'Aprobar/Rechazar' y dejar solo el enlace al Admin Web
         nuevo_markup = {
             "inline_keyboard": [
                 [
