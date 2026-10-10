@@ -1,12 +1,25 @@
 // CONFIGURACIÓN DE SUPABASE
 const SUPABASE_URL = "https://dxicbitnnesjsqzxisea.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR4aWNiaXRubmVzanNxenhpc2VhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE0MTQzMTMsImV4cCI6MjEwNjk5MDMxM30.0xUXIa0Bby7xpJAF_N3y-n_H3SPwVlUBb9m630AFPtw"; // Poner tu Anon Key real
-const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// Reemplaza esta cadena con tu anon key de Supabase (Project Settings -> API -> anon public key)
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR4aWNiaXRubmVzanNxenhpc2VhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE0MTQzMTMsImV4cCI6MjEwNjk5MDMxM30.0xUXIa0Bby7xpJAF_N3y-n_H3SPwVlUBb9m630AFPtw"; 
 
+let supabaseClient = null;
 let deduccionAcumuladaBs = parseFloat(localStorage.getItem('admin_deduccion_bs') || 0);
 
 document.addEventListener('DOMContentLoaded', () => {
-  lucide.createIcons();
+  if (window.lucide) {
+    lucide.createIcons();
+  }
+  
+  // Inicialización segura del cliente Supabase
+  try {
+    if (window.supabase && typeof window.supabase.createClient === 'function') {
+      supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    }
+  } catch (err) {
+    console.error("Error al conectar con Supabase:", err);
+  }
+
   loadAdminConfig();
 });
 
@@ -18,10 +31,16 @@ function switchTab(tabName) {
     btn.classList.add('bg-slate-900', 'text-slate-400');
   });
 
-  document.getElementById(`tab-${tabName}`).classList.remove('hidden');
+  const targetTab = document.getElementById(`tab-${tabName}`);
+  if (targetTab) {
+    targetTab.classList.remove('hidden');
+  }
+
   const activeBtn = document.getElementById(`tabBtn-${tabName}`);
-  activeBtn.classList.add('active', 'bg-purple-600', 'text-white');
-  activeBtn.classList.remove('bg-slate-900', 'text-slate-400');
+  if (activeBtn) {
+    activeBtn.classList.add('active', 'bg-purple-600', 'text-white');
+    activeBtn.classList.remove('bg-slate-900', 'text-slate-400');
+  }
 
   if (tabName === 'compras') loadAdminCompras();
   if (tabName === 'finanzas') calcularEstadisticasFinancieras();
@@ -33,20 +52,23 @@ function loadAdminConfig() {
   const saved = localStorage.getItem('album_app_config');
   const config = saved ? JSON.parse(saved) : {
     logoUrl: 'https://via.placeholder.com/120/581c87/ffffff?text=ALBUM',
-    banco: 'Banesco (0134)',
-    cedula: 'V-12345678',
-    telefono: '04121234567',
-    titular: 'Cuenta Principal'
+    banco: '0134',
+    cedula: '21101658',
+    telefono: '+584129830982',
+    titular: 'ÁLBUM DIGITAL'
   };
 
-  document.getElementById('faviconTag').href = config.logoUrl;
-  document.getElementById('adminLogoPreview').src = config.logoUrl;
+  const favicon = document.getElementById('faviconTag');
+  if (favicon && config.logoUrl) favicon.href = config.logoUrl;
 
-  document.getElementById('adminLogoUrlInput').value = config.logoUrl;
-  document.getElementById('adminBancoInput').value = config.banco;
-  document.getElementById('adminCedulaInput').value = config.cedula;
-  document.getElementById('adminTelefonoInput').value = config.telefono;
-  document.getElementById('adminTitularInput').value = config.titular;
+  const preview = document.getElementById('adminLogoPreview');
+  if (preview && config.logoUrl) preview.src = config.logoUrl;
+
+  if (document.getElementById('adminLogoUrlInput')) document.getElementById('adminLogoUrlInput').value = config.logoUrl || '';
+  if (document.getElementById('adminBancoInput')) document.getElementById('adminBancoInput').value = config.banco || '';
+  if (document.getElementById('adminCedulaInput')) document.getElementById('adminCedulaInput').value = config.cedula || '';
+  if (document.getElementById('adminTelefonoInput')) document.getElementById('adminTelefonoInput').value = config.telefono || '';
+  if (document.getElementById('adminTitularInput')) document.getElementById('adminTitularInput').value = config.titular || '';
 }
 
 function saveAdminConfig() {
@@ -60,17 +82,28 @@ function saveAdminConfig() {
 
   localStorage.setItem('album_app_config', JSON.stringify(config));
   loadAdminConfig();
-  alert("✅ Configuración de Pago Móvil y Logo guardada.");
+  alert("✅ Configuración de Pago Móvil y Logo guardada con éxito.");
 }
 
 // 2. COMPRAS Y VERIFICACIÓN
 async function loadAdminCompras() {
   const tbody = document.getElementById('adminComprasTableBody');
+  if (!tbody) return;
   tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-500">Cargando transacciones...</td></tr>`;
 
+  if (!supabaseClient) {
+    tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-amber-400">Verifica la API key de Supabase en admin-script.js.</td></tr>`;
+    return;
+  }
+
   try {
-    const { data, error } = await supabase.from('transacciones').select('*').order('created_at', { ascending: false });
+    const { data, error } = await supabaseClient.from('transacciones').select('*').order('created_at', { ascending: false });
     if (error || !data) throw error;
+
+    if (data.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-500">No hay compras registradas.</td></tr>`;
+      return;
+    }
 
     tbody.innerHTML = data.map(tx => `
       <tr class="hover:bg-slate-950/50">
@@ -82,7 +115,7 @@ async function loadAdminCompras() {
           <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${
             tx.estado === 'aprobado' ? 'bg-emerald-500/20 text-emerald-400' :
             tx.estado === 'rechazado' ? 'bg-red-500/20 text-red-400' : 'bg-amber-500/20 text-amber-400'
-          }">${tx.estado.toUpperCase()}</span>
+          }">${tx.estado ? tx.estado.toUpperCase() : 'PENDIENTE'}</span>
         </td>
         <td class="p-3 text-center space-x-1">
           ${tx.estado === 'pendiente' ? `
@@ -93,33 +126,36 @@ async function loadAdminCompras() {
       </tr>
     `).join('');
   } catch (err) {
+    console.error(err);
     tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-red-400">Error al consultar Supabase.</td></tr>`;
   }
 }
 
 async function procesarEstadoCompra(txId, nuevoEstado) {
+  if (!supabaseClient) return;
   try {
-    await supabase.from('transacciones').update({ estado: nuevoEstado }).eq('id', txId);
+    await supabaseClient.from('transacciones').update({ estado: nuevoEstado }).eq('id', txId);
     loadAdminCompras();
   } catch (e) {
     alert("Error actualizando estado.");
   }
 }
 
-// 3. ESTADÍSTICAS FINANCIERAS (GANANCIA DEL 30%)
+// 3. ESTADÍSTICAS FINANCIERAS (30% GANANCIA)
 async function calcularEstadisticasFinancieras() {
+  if (!supabaseClient) return;
   try {
-    const { data } = await supabase.from('transacciones').select('monto_bs').eq('estado', 'aprobado');
+    const { data } = await supabaseClient.from('transacciones').select('monto_bs').eq('estado', 'aprobado');
     const totalVentasBs = (data || []).reduce((acc, curr) => acc + parseFloat(curr.monto_bs || 0), 0);
 
     const gananciaPlataformaBs = totalVentasBs * 0.30;
     const fondoPremiosBs = totalVentasBs * 0.70;
     const saldoBancoReal = totalVentasBs - deduccionAcumuladaBs;
 
-    document.getElementById('statTotalVentas').innerText = `Bs. ${totalVentasBs.toFixed(2)}`;
-    document.getElementById('statFondoPremios').innerText = `Bs. ${fondoPremiosBs.toFixed(2)}`;
-    document.getElementById('statGananciaPlataforma').innerText = `Bs. ${gananciaPlataformaBs.toFixed(2)}`;
-    document.getElementById('statSaldoBancoReal').innerText = `Bs. ${saldoBancoReal.toFixed(2)}`;
+    if (document.getElementById('statTotalVentas')) document.getElementById('statTotalVentas').innerText = `Bs. ${totalVentasBs.toFixed(2)}`;
+    if (document.getElementById('statFondoPremios')) document.getElementById('statFondoPremios').innerText = `Bs. ${fondoPremiosBs.toFixed(2)}`;
+    if (document.getElementById('statGananciaPlataforma')) document.getElementById('statGananciaPlataforma').innerText = `Bs. ${gananciaPlataformaBs.toFixed(2)}`;
+    if (document.getElementById('statSaldoBancoReal')) document.getElementById('statSaldoBancoReal').innerText = `Bs. ${saldoBancoReal.toFixed(2)}`;
   } catch (e) {
     console.error("Error calculando estadísticas:", e);
   }
@@ -139,11 +175,19 @@ function aplicarDeduccionBancaria() {
 // 4. SOLICITUDES DE PREMIOS
 async function loadAdminPremios() {
   const tbody = document.getElementById('adminPremiosTableBody');
+  if (!tbody) return;
   tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-slate-500">Cargando solicitudes...</td></tr>`;
 
+  if (!supabaseClient) return;
+
   try {
-    const { data } = await supabase.from('retiros_premios').select('*').order('created_at', { ascending: false });
-    tbody.innerHTML = (data || []).map(r => `
+    const { data } = await supabaseClient.from('retiros_premios').select('*').order('created_at', { ascending: false });
+    if (!data || data.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="7" class="p-4 text-center text-slate-500">No hay solicitudes de premios.</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = data.map(r => `
       <tr class="hover:bg-slate-950/50">
         <td class="p-3 font-mono">${r.id}</td>
         <td class="p-3 font-bold text-white">${r.usuario_id}</td>
@@ -162,12 +206,14 @@ async function loadAdminPremios() {
 }
 
 async function marcarPremioPagado(id) {
-  await supabase.from('retiros_premios').update({ estado: 'aprobado' }).eq('id', id);
+  if (!supabaseClient) return;
+  await supabaseClient.from('retiros_premios').update({ estado: 'aprobado' }).eq('id', id);
   loadAdminPremios();
 }
 
 // 5. CARGA MASIVA DE BARAJITAS
 async function ejecutarCargaMasivaBarajitas() {
+  if (!supabaseClient) return alert("Cliente de Supabase no conectado.");
   const rawText = document.getElementById('adminMasivoInput').value.trim();
   if (!rawText) return alert("Ingresa datos válidos.");
 
@@ -182,7 +228,7 @@ async function ejecutarCargaMasivaBarajitas() {
   }).filter(item => item.numero && item.nombre && item.imagen_url);
 
   try {
-    const { error } = await supabase.from('barajitas').upsert(payload);
+    const { error } = await supabaseClient.from('barajitas').upsert(payload);
     if (error) throw error;
     alert(`✅ ¡${payload.length} barajitas guardadas en Supabase!`);
     document.getElementById('adminMasivoInput').value = '';
