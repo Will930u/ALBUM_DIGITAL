@@ -43,26 +43,37 @@ def send_telegram_inline_keyboard(chat_id: str, text: str, reply_markup: dict):
         return False
 
 def procesar_aprobacion_compra(referencia, usuario_id, qty, monto_bs):
-    """Lógica unificada para abonar el 70% neto en saldo Bs y barajitas al usuario."""
+    """Lógica unificada y segura para abonar el 70% neto en saldo Bs y barajitas al usuario."""
     if not supabase_client:
         return False
     try:
         user_net = float(monto_bs) * 0.70
+        qty_int = int(qty)
+        
         # 1. Cambiar estado de la transacción a aprobado
         supabase_client.table("transacciones").update({"estado": "aprobado"}).eq("referencia", str(referencia)).execute()
         
-        # 2. Consultar usuario y sumar barajitas y saldo neto
-        u_res = supabase_client.table("usuarios").select("*").eq("id", str(usuario_id)).execute()
-        if u_res.data:
-            curr_qty = u_res.data[0].get("cantidad_barajitas", 0) or 0
-            curr_bal = u_res.data[0].get("saldo_bs", 0.0) or 0.0
+        # 2. Consultar usuario actual para obtener sus valores previos reales
+        u_res = supabase_client.table("usuarios").select("cantidad_barajitas, saldo_bs").eq("id", str(usuario_id)).execute()
+        
+        if u_res.data and len(u_res.data) > 0:
+            current_data = u_res.data[0]
+            curr_qty = int(current_data.get("cantidad_barajitas") or 0)
+            curr_bal = float(current_data.get("saldo_bs") or 0.0)
+            
+            nuevas_barajitas = curr_qty + qty_int
+            nuevo_saldo = curr_bal + user_net
+
+            # 3. Actualizar con los valores sumados
             supabase_client.table("usuarios").update({
-                "cantidad_barajitas": int(curr_qty) + int(qty),
-                "saldo_bs": float(curr_bal) + user_net
+                "cantidad_barajitas": nuevas_barajitas,
+                "saldo_bs": nuevo_saldo
             }).eq("id", str(usuario_id)).execute()
             return True
+        else:
+            print(f"Usuario {usuario_id} no encontrado en la tabla public.usuarios")
     except Exception as e:
-        print(f"Error al procesar aprobación de compra: {e}")
+        print(f"Error crítico al procesar aprobación de compra: {e}")
     return False
 
 def procesar_rechazo_compra(referencia):
