@@ -1,29 +1,27 @@
-import os
-import requests
-import threading
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from supabase import create_client, Client
+from werkzeug.security import generate_password_hash, check_password_hash
+import os
+import requests
+import threading
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
 
-# Variables de entorno en Render
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or os.environ.get("SUPABASE_KEY", "")
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_ADMIN_CHAT_ID = os.environ.get("TELEGRAM_ADMIN_CHAT_ID", "")
-
-# URL del Panel Administrador Independiente en GitHub Pages
 ADMIN_PANEL_URL = "https://will930u.github.io/ALBUM_DIGITAL/admin.html"
 
-# Cliente Supabase
 supabase_client: Client = None
 if SUPABASE_URL and SUPABASE_KEY:
     try:
         supabase_client = create_client(SUPABASE_URL, SUPABASE_KEY)
-    except Exception as e:
-        print(f"Error al inicializar Supabase: {e}")
+    except Exception as exc:
+        print(f"Error al inicializar Supabase: {exc}")
+
 
 def send_telegram_inline_keyboard(chat_id: str, text: str, reply_markup: dict):
     if not TELEGRAM_BOT_TOKEN or not chat_id:
@@ -33,14 +31,15 @@ def send_telegram_inline_keyboard(chat_id: str, text: str, reply_markup: dict):
         "chat_id": chat_id,
         "text": text,
         "parse_mode": "HTML",
-        "reply_markup": reply_markup
+        "reply_markup": reply_markup,
     }
     try:
         res = requests.post(url, json=payload, timeout=5)
         return res.json() if res.ok else None
-    except Exception as e:
-        print(f"Error enviando notificación a Telegram: {e}")
+    except Exception as exc:
+        print(f"Error enviando notificación a Telegram: {exc}")
         return None
+
 
 def procesar_aprobacion_compra(referencia, usuario_id, qty, monto_bs):
     if not supabase_client:
@@ -48,26 +47,26 @@ def procesar_aprobacion_compra(referencia, usuario_id, qty, monto_bs):
     try:
         user_net = float(monto_bs) * 0.70
         qty_int = int(qty)
-        
+
         supabase_client.table("transacciones").update({"estado": "aprobado"}).eq("referencia", str(referencia)).execute()
         u_res = supabase_client.table("usuarios").select("cantidad_barajitas, saldo_bs").eq("id", str(usuario_id)).execute()
-        
+
         if u_res.data and len(u_res.data) > 0:
             current_data = u_res.data[0]
             curr_qty = int(current_data.get("cantidad_barajitas") or 0)
             curr_bal = float(current_data.get("saldo_bs") or 0.0)
-            
+
             nuevas_barajitas = curr_qty + qty_int
             nuevo_saldo = curr_bal + user_net
-
             supabase_client.table("usuarios").update({
                 "cantidad_barajitas": nuevas_barajitas,
-                "saldo_bs": nuevo_saldo
+                "saldo_bs": nuevo_saldo,
             }).eq("id", str(usuario_id)).execute()
             return True
-    except Exception as e:
-        print(f"Error crítico procesando aprobación: {e}")
+    except Exception as exc:
+        print(f"Error crítico procesando aprobación: {exc}")
     return False
+
 
 def procesar_rechazo_compra(referencia):
     if not supabase_client:
@@ -75,9 +74,10 @@ def procesar_rechazo_compra(referencia):
     try:
         supabase_client.table("transacciones").update({"estado": "rechazado"}).eq("referencia", str(referencia)).execute()
         return True
-    except Exception as e:
-        print(f"Error procesando rechazo: {e}")
+    except Exception as exc:
+        print(f"Error procesando rechazo: {exc}")
     return False
+
 
 def TareaSecundariaTelegram(callback_id, chat_id, message_id, callback_data, original_text):
     """Procesa la BD y edita el mensaje de Telegram en segundo plano sin bloquear a Telegram."""
@@ -102,94 +102,129 @@ def TareaSecundariaTelegram(callback_id, chat_id, message_id, callback_data, ori
         procesar_rechazo_compra(ref)
         nuevo_texto += "\n\n🔴 <b>COMPRA RECHAZADA DESDE TELEGRAM</b>"
 
-    # Editar el mensaje final removiendo los botones de acción
     nuevo_markup = {
-        "inline_keyboard": [
-            [{"text": "⚙️ ABRIR PANEL DE ADMINISTRACIÓN", "url": ADMIN_PANEL_URL}]
-        ]
+        "inline_keyboard": [[{"text": "⚙️ ABRIR PANEL DE ADMINISTRACIÓN", "url": ADMIN_PANEL_URL}]]
     }
 
     try:
-        requests.post(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/editMessageText", json={
-            "chat_id": chat_id,
-            "message_id": message_id,
-            "text": nuevo_texto,
-            "parse_mode": "HTML",
-            "reply_markup": nuevo_markup
-        }, timeout=5)
-    except Exception as e:
-        print(f"Error editando mensaje en Telegram: {e}")
+        requests.post(
+            f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/editMessageText",
+            json={
+                "chat_id": chat_id,
+                "message_id": message_id,
+                "text": nuevo_texto,
+                "parse_mode": "HTML",
+                "reply_markup": nuevo_markup,
+            },
+            timeout=5,
+        )
+    except Exception as exc:
+        print(f"Error editando mensaje en Telegram: {exc}")
+
 
 @app.route("/", methods=["GET"])
 def index():
     return jsonify({"status": "online", "service": "Backend Asíncrono"}), 200
+
+
+@app.route("/api/health", methods=["GET"])
+def health():
+    return jsonify({
+        "status": "ok",
+        "supabase": bool(supabase_client),
+        "telegram": bool(TELEGRAM_BOT_TOKEN),
+    }), 200
+
 
 @app.route("/api/bcv", methods=["GET"])
 def get_bcv_rate():
     try:
         res = requests.get("https://ve.dolarapi.com/v1/dolares/oficial", timeout=5)
         if res.ok:
-            return jsonify({"status": "success", "promedio": res.json().get("promedio", 0)}), 200
+            data = res.json() or {}
+            return jsonify({"status": "success", "promedio": data.get("promedio", 0)}), 200
         return jsonify({"status": "error", "message": "Error al consultar BCV"}), 502
-    except Exception as e:
-        return jsonify({"status": "error", "details": str(e)}), 500
+    except Exception as exc:
+        return jsonify({"status": "error", "details": str(exc)}), 500
+
 
 @app.route("/api/register", methods=["POST"])
 def register():
     data = request.get_json(silent=True) or {}
-    username = data.get("username")
-    password = data.get("password")
-    gmail = data.get("gmail")
-    banco = data.get("banco")
-    cedula = data.get("cedula")
-    telefono = data.get("telefono")
+    username = str(data.get("username") or "").strip()
+    password = str(data.get("password") or "").strip()
+    gmail = str(data.get("gmail") or "").strip()
+    banco = str(data.get("banco") or "").strip()
+    cedula = str(data.get("cedula") or "").strip()
+    telefono = str(data.get("telefono") or "").strip()
 
     if not all([username, password, gmail, banco, cedula, telefono]):
         return jsonify({"status": "error", "message": "Campos requeridos"}), 400
 
-    user_id = f"USR-{username.upper()}"
+    if len(password) < 6:
+        return jsonify({"status": "error", "message": "La contraseña debe tener al menos 6 caracteres"}), 400
 
-    if supabase_client:
-        try:
-            res = supabase_client.table("usuarios").insert({
-                "id": user_id,
-                "nombre": username,
-                "username": username,
-                "password_hash": password,
-                "gmail": gmail,
-                "banco": banco,
-                "cedula": cedula,
-                "telefono": telefono,
-                "saldo_usd": 0.0,
-                "cantidad_barajitas": 0,
-                "saldo_bs": 0.0
-            }).execute()
-            user_data = res.data[0] if res.data else {"id": user_id, "username": username}
-            return jsonify({"status": "success", "user": user_data}), 200
-        except Exception as e:
-            return jsonify({"status": "error", "message": "Error registrando usuario", "details": str(e)}), 400
+    if not supabase_client:
+        return jsonify({"status": "error", "message": "Base de datos no disponible"}), 500
 
-    return jsonify({"status": "error", "message": "Base de datos no disponible"}), 500
+    try:
+        existing = supabase_client.table("usuarios").select("id").eq("username", username).execute()
+        if existing.data and len(existing.data) > 0:
+            return jsonify({"status": "error", "message": "El usuario ya existe"}), 409
+
+        user_id = f"USR-{username.upper()}"
+        password_hash = generate_password_hash(password)
+        res = supabase_client.table("usuarios").insert({
+            "id": user_id,
+            "nombre": username,
+            "username": username,
+            "password_hash": password_hash,
+            "gmail": gmail,
+            "banco": banco,
+            "cedula": cedula,
+            "telefono": telefono,
+            "saldo_usd": 0.0,
+            "cantidad_barajitas": 0,
+            "saldo_bs": 0.0,
+        }).execute()
+        user_data = res.data[0] if res.data else {"id": user_id, "username": username}
+        return jsonify({"status": "success", "user": user_data}), 200
+    except Exception as exc:
+        return jsonify({"status": "error", "message": "Error registrando usuario", "details": str(exc)}), 400
+
 
 @app.route("/api/login", methods=["POST"])
 def login():
     data = request.get_json(silent=True) or {}
-    username = data.get("username")
-    password = data.get("password")
+    username = str(data.get("username") or "").strip()
+    password = str(data.get("password") or "").strip()
 
     if not username or not password:
         return jsonify({"status": "error", "message": "Faltan credenciales"}), 400
 
-    if supabase_client:
-        try:
-            res = supabase_client.table("usuarios").select("*").eq("username", username).eq("password_hash", password).execute()
-            if res.data and len(res.data) > 0:
-                return jsonify({"status": "success", "user": res.data[0]}), 200
-            return jsonify({"status": "error", "message": "Usuario o clave incorrectos"}), 401
-        except Exception as e:
-            return jsonify({"status": "error", "details": str(e)}), 500
+    if not supabase_client:
+        return jsonify({"status": "error", "message": "BD no disponible"}), 500
 
-    return jsonify({"status": "error", "message": "BD no disponible"}), 500
+    try:
+        res = supabase_client.table("usuarios").select("*").eq("username", username).execute()
+        if not res.data or len(res.data) == 0:
+            return jsonify({"status": "error", "message": "Usuario o clave incorrectos"}), 401
+
+        user_data = res.data[0]
+        stored_hash = user_data.get("password_hash") or ""
+        is_valid = False
+        if stored_hash:
+            is_valid = check_password_hash(stored_hash, password)
+        if not is_valid and stored_hash == password:
+            is_valid = True
+
+        if not is_valid:
+            return jsonify({"status": "error", "message": "Usuario o clave incorrectos"}), 401
+
+        return jsonify({"status": "success", "user": user_data}), 200
+    except Exception as exc:
+        return jsonify({"status": "error", "details": str(exc)}), 500
+
 
 @app.route("/api/notificar-compra", methods=["POST"])
 def notificar_compra():
@@ -220,11 +255,9 @@ def notificar_compra():
         "inline_keyboard": [
             [
                 {"text": "🟢 APROBAR COMPRA", "callback_data": f"aprob_compra:{referencia}:{usuario_id}:{barajitas_qty}:{monto_bs}"},
-                {"text": "🔴 RECHAZAR", "callback_data": f"rech_compra:{referencia}"}
+                {"text": "🔴 RECHAZAR", "callback_data": f"rech_compra:{referencia}"},
             ],
-            [
-                {"text": "⚙️ ABRIR PANEL DE ADMINISTRACIÓN", "url": ADMIN_PANEL_URL}
-            ]
+            [{"text": "⚙️ ABRIR PANEL DE ADMINISTRACIÓN", "url": ADMIN_PANEL_URL}],
         ]
     }
 
@@ -243,12 +276,13 @@ def notificar_compra():
                 "telefono_emisor": str(telefono_emisor),
                 "estado": "pendiente",
                 "telegram_chat_id": str(TELEGRAM_ADMIN_CHAT_ID),
-                "telegram_message_id": msg_id
+                "telegram_message_id": msg_id,
             }).execute()
-        except Exception as e:
-            print(f"Error insertando transacción: {e}")
+        except Exception as exc:
+            print(f"Error insertando transacción: {exc}")
 
     return jsonify({"status": "success"}), 200
+
 
 @app.route("/webhook/telegram", methods=["POST"])
 def webhook_telegram():
@@ -263,26 +297,26 @@ def webhook_telegram():
         message_id = message["message_id"]
         original_text = message.get("text", "")
 
-        # 1. Responder INMEDIATAMENTE a Telegram para evitar BOT_RESPONSE_TIMEOUT
         try:
             requests.post(
-                f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/answerCallbackQuery", 
+                f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/answerCallbackQuery",
                 json={"callback_query_id": callback_id, "text": "⚡ Procesando solicitud..."},
-                timeout=2
+                timeout=2,
             )
-        except Exception as e:
-            print(f"Error answerCallbackQuery: {e}")
+        except Exception as exc:
+            print(f"Error answerCallbackQuery: {exc}")
 
-        # 2. Iniciar procesamiento en segundo plano
         hilo = threading.Thread(
             target=TareaSecundariaTelegram,
-            args=(callback_id, chat_id, message_id, callback_data, original_text)
+            args=(callback_id, chat_id, message_id, callback_data, original_text),
         )
+        hilo.daemon = True
         hilo.start()
 
         return jsonify({"status": "ok"}), 200
 
     return jsonify({"status": "ok"}), 200
+
 
 @app.route("/api/admin/procesar-compra", methods=["POST"])
 def admin_procesar_compra():
@@ -302,8 +336,8 @@ def admin_procesar_compra():
             tx_res = supabase_client.table("transacciones").select("*").eq("referencia", referencia).execute()
             if tx_res.data:
                 tx_data = tx_res.data[0]
-        except Exception as e:
-            print(f"Error consultando transacción: {e}")
+        except Exception as exc:
+            print(f"Error consultando transacción: {exc}")
 
     chat_id = tx_data.get("telegram_chat_id") or TELEGRAM_ADMIN_CHAT_ID
     msg_id = tx_data.get("telegram_message_id")
@@ -315,22 +349,32 @@ def admin_procesar_compra():
 
     if msg_id and chat_id:
         estado_texto = "✅ <b>COMPRA APROBADA DESDE EL PANEL ADMIN</b>" if estado == "aprobado" else "🔴 <b>COMPRA RECHAZADA DESDE EL PANEL ADMIN</b>"
-        texto_actualizado = f"🛒 <b>SOLICITUD PROCESADA</b>\n\n👤 <b>Usuario ID:</b> <code>{usuario_id}</code>\n🔢 <b>Referencia:</b> <code>{referencia}</code>\n\n{estado_texto}"
+        texto_actualizado = (
+            f"🛒 <b>SOLICITUD PROCESADA</b>\n\n"
+            f"👤 <b>Usuario ID:</b> <code>{usuario_id}</code>\n"
+            f"🔢 <b>Referencia:</b> <code>{referencia}</code>\n\n"
+            f"{estado_texto}"
+        )
 
         try:
-            requests.post(f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/editMessageText", json={
-                "chat_id": chat_id,
-                "message_id": int(msg_id),
-                "text": texto_actualizado,
-                "parse_mode": "HTML",
-                "reply_markup": {"inline_keyboard": [[{"text": "⚙️ ABRIR PANEL DE ADMINISTRACIÓN", "url": ADMIN_PANEL_URL}]]}
-            }, timeout=4)
-        except Exception as e:
-            print(f"Error editando mensaje: {e}")
+            requests.post(
+                f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/editMessageText",
+                json={
+                    "chat_id": chat_id,
+                    "message_id": int(msg_id),
+                    "text": texto_actualizado,
+                    "parse_mode": "HTML",
+                    "reply_markup": {"inline_keyboard": [[{"text": "⚙️ ABRIR PANEL DE ADMINISTRACIÓN", "url": ADMIN_PANEL_URL}]]},
+                },
+                timeout=4,
+            )
+        except Exception as exc:
+            print(f"Error editando mensaje: {exc}")
 
     if ok:
         return jsonify({"status": "success"}), 200
     return jsonify({"status": "error"}), 500
+
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
